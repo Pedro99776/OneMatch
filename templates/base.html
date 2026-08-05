@@ -1,0 +1,59 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OneMatch - Encontre sua conexão única</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="O app de relacionamento onde você só pode ter um match por vez. Conexões mais genuínas e intencionais.">
+    
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons (Premium Icons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- HTMX para reatividade sem recarregar a página -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Alpine.js para micro-interações do frontend (Swipe, modais) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Nosso CSS Premium -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    
+    <main class="app-container">
+        <!-- Header Principal -->
+        <header class="app-header glass-panel" style="border-radius: 0 0 var(--radius-lg) var(--radius-lg); margin-bottom: 20px;">
+            <div class="logo-text">One<span style="color: var(--color-primary-light);">Match</span></div>
+            
+            <div class="header-actions">
+                <!-- Se logado e SEM match: ícone de perfil -->
+                <!-- Se logado COM match: botão brilhante do chat -->
+                <button class="btn btn-glass" style="padding: 8px; border-radius: 50%;">
+                    <i class="ph ph-user" style="font-size: 1.2rem;"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Container dinâmico via HTMX -->
+        <div id="main-content" class="animate-fade-in" style="flex: 1; display: flex; flex-direction: column;">
+            {% block content %}
+            {% endblock %}
+        </div>
+    </main>
+
+    <!-- PWA Setup Futuro -->
+    <script>
+        document.body.addEventListener('htmx:configRequest', (event) => {
+            // Configurações globais do HTMX se necessário
+        });
+    </script>
+</body>
+</html>
