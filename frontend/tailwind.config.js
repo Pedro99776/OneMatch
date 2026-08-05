@@ -25,6 +25,8 @@ export default {
         'heartbeat': 'heartbeat 1.5s ease-in-out infinite',
         'float': 'float 4s ease-in-out infinite',
         'match-celebration': 'match-celebration 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+        'card-swipe-right': 'card-swipe-right 0.4s ease-out forwards',
+        'card-swipe-left': 'card-swipe-left 0.4s ease-out forwards',
       },
       keyframes: {
         fadeInUp: {

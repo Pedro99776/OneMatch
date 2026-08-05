@@ -65,7 +65,7 @@ export default function ProfilePage() {
     navigate('/');
   };
 
-  const genderLabels = { M: 'Masculino', F: 'Feminino', NB: 'Não-binário', O: 'Outro' };
+  const genderLabels = { M: 'Masculino', F: 'Feminino' };
   const lookingForLabels = { M: 'Homens', F: 'Mulheres', A: 'Todos' };
 
   return (
@@ -191,8 +191,6 @@ export default function ProfilePage() {
                       <option value="">Selecione</option>
                       <option value="M">Masculino</option>
                       <option value="F">Feminino</option>
-                      <option value="NB">Não-binário</option>
-                      <option value="O">Outro</option>
                     </select>
                   ) : (
                     <p className="text-gray-100 text-sm">{genderLabels[profile?.gender] || '—'}</p>

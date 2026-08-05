@@ -44,7 +44,8 @@ export default function DiscoveryPage() {
     setSwipeDirection('right');
 
     try {
-      const { data } = await matchingAPI.giveLike(currentProfile.id, isSuperLike);
+      // Usa user_id (não profile id) para identificar o destinatário do like
+      const { data } = await matchingAPI.giveLike(currentProfile.user_id, isSuperLike);
 
       if (data.is_match) {
         setTimeout(() => {
@@ -58,8 +59,22 @@ export default function DiscoveryPage() {
         }, 400);
       }
     } catch (err) {
-      console.error('Error giving like:', err);
       setSwipeDirection(null);
+      const code = err.response?.data?.code;
+      const serverMsg = err.response?.data?.message;
+
+      if (code === 'has_active_match') {
+        // Não deveria acontecer (feed já bloqueia), mas como segurança extra
+        navigate('/chat');
+      } else if (code === 'daily_limit') {
+        alert(serverMsg || 'Você atingiu o limite de likes por dia.');
+      } else if (code === 'target_unavailable' || code === 'generic_error' || err.response?.status === 409) {
+        // Erro genérico — não revela que o outro deu match com alguém
+        setCurrentIndex((prev) => prev + 1);
+      } else {
+        console.error('Error giving like:', err);
+        setCurrentIndex((prev) => prev + 1);
+      }
     } finally {
       setIsLiking(false);
     }

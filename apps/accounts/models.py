@@ -21,9 +21,7 @@ class Profile(models.Model):
     """Perfil público do usuário"""
     GENDER_CHOICES = [
         ('M', 'Masculino'), 
-        ('F', 'Feminino'), 
-        ('NB', 'Não-binário'), 
-        ('O', 'Outro')
+        ('F', 'Feminino'),
     ]
     LOOKING_FOR_CHOICES = [
         ('M', 'Homens'), 
@@ -34,7 +32,7 @@ class Profile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='profile')
     display_name = models.CharField(max_length=50, blank=True, default='')
     bio = models.TextField(max_length=500, blank=True)
-    gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=True, default='')
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True, default='')
     looking_for = models.CharField(max_length=1, choices=LOOKING_FOR_CHOICES, blank=True, default='')
     
     # Localização (MVP com Cidade/Estado, preparado para PostGIS no futuro)

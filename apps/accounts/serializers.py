@@ -45,11 +45,13 @@ class ProfilePhotoSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     photos = ProfilePhotoSerializer(many=True, read_only=True)
+    # user_id é exposto para que o frontend saiba qual ID enviar no like
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
     
     class Meta:
         model = Profile
         fields = (
-            'id', 'display_name', 'bio', 'gender', 'looking_for', 
+            'id', 'user_id', 'display_name', 'bio', 'gender', 'looking_for', 
             'city', 'state', 'has_active_match', 'photos'
         )
-        read_only_fields = ('has_active_match',)
+        read_only_fields = ('has_active_match', 'user_id')

@@ -44,8 +44,6 @@ export default function ProfileSetupPage() {
   const genderOptions = [
     { value: 'M', label: 'Masculino', emoji: '👨' },
     { value: 'F', label: 'Feminino', emoji: '👩' },
-    { value: 'NB', label: 'Não-binário', emoji: '🧑' },
-    { value: 'O', label: 'Outro', emoji: '✨' },
   ];
 
   const lookingForOptions = [
