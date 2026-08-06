@@ -4,8 +4,10 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 from .serializers import CustomTokenObtainPairSerializer
-from .views import RegisterView, ProfileView, ProfilePhotoUploadView, ProfilePhotoDeleteView, MeView
-
+from .views import (
+    RegisterView, ProfileView, ProfilePhotoUploadView, ProfilePhotoDeleteView, MeView,
+    ChangePasswordView, DeleteAccountView
+)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -24,4 +26,8 @@ urlpatterns = [
     path('profile/me/', ProfileView.as_view(), name='profile_me'),
     path('profile/photos/', ProfilePhotoUploadView.as_view(), name='profile_photos'),
     path('profile/photos/<int:pk>/', ProfilePhotoDeleteView.as_view(), name='profile_photo_delete'),
+    
+    # Segurança
+    path('profile/change-password/', ChangePasswordView.as_view(), name='change_password'),
+    path('profile/delete-account/', DeleteAccountView.as_view(), name='delete_account'),
 ]

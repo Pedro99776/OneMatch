@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, X, MapPin, Sparkles, Loader2, RefreshCw, User } from 'lucide-react';
+import { Heart, X, MapPin, Sparkles, Loader2, RefreshCw, User, Info, ArrowLeft, MessageCircle } from 'lucide-react';
 import { discoveryAPI, matchingAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -12,6 +12,7 @@ export default function DiscoveryPage() {
   const [isLiking, setIsLiking] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState(null);
   const [showMatch, setShowMatch] = useState(null);
+  const [showFullProfile, setShowFullProfile] = useState(false);
   const { profile, loadProfile } = useAuth();
   const navigate = useNavigate();
 
@@ -29,12 +30,10 @@ export default function DiscoveryPage() {
   }, []);
 
   useEffect(() => {
-    if (profile?.has_active_match) {
-      navigate('/chat');
-      return;
+    if (!profile?.has_active_match) {
+      loadFeed();
     }
-    loadFeed();
-  }, [profile, navigate, loadFeed]);
+  }, [profile, loadFeed]);
 
   // Polling para descobrir se recebeu um match de outra pessoa enquanto navega
   useEffect(() => {
@@ -151,6 +150,108 @@ export default function DiscoveryPage() {
     );
   }
 
+  if (profile?.has_active_match) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-6">
+            <Heart className="w-10 h-10 text-red-500 fill-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold font-heading mb-3">Você já tem um match!</h2>
+          <p className="text-gray-400 mb-8 max-w-sm mx-auto">
+            Você não pode ver novos cards enquanto tiver um match ativo. 
+          </p>
+          <button onClick={() => navigate('/chat')} className="btn-primary group">
+            <span className="flex items-center gap-2">
+              Ir para a Conversa <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            </span>
+          </button>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (showFullProfile && currentProfile) {
+    return (
+      <AppLayout>
+        <div className="flex-1 overflow-y-auto bg-[#0a0a0f] hide-scrollbar relative">
+          <div className="relative w-full aspect-[3/4] max-h-[65vh]">
+            <button 
+              onClick={() => setShowFullProfile(false)}
+              className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors backdrop-blur-sm border border-white/10"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            {currentProfile.photos && currentProfile.photos.length > 0 ? (
+              <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory hide-scrollbar">
+                {currentProfile.photos.map((photo) => (
+                  <img key={photo.id} src={photo.image} alt="Profile" className="w-full h-full object-cover shrink-0 snap-center" />
+                ))}
+              </div>
+            ) : (
+              <div className="w-full h-full bg-[#1a1a2e] flex items-center justify-center">
+                <User className="w-24 h-24 text-gray-600/30" />
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#0a0a0f] to-transparent pointer-events-none" />
+          </div>
+          <div className="px-6 py-4 -mt-8 relative z-10 mb-28">
+            <h2 className="text-3xl font-bold text-white mb-2">{currentProfile.display_name}</h2>
+            <div className="flex items-center gap-1.5 text-purple-400 mb-6">
+              <MapPin className="w-4 h-4" />
+              <span>{currentProfile.city}, {currentProfile.state}</span>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Sobre</h3>
+                <p className="text-gray-300 text-sm leading-relaxed">{currentProfile.bio || 'Nenhuma bio definida.'}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-[rgba(139,92,246,0.15)]">
+                  <span className="text-xs text-gray-500 uppercase block mb-1">Gênero</span>
+                  <span className="text-sm font-medium text-gray-200">
+                    {currentProfile.gender === 'M' ? 'Masculino' : currentProfile.gender === 'F' ? 'Feminino' : 'Não especificado'}
+                  </span>
+                </div>
+                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-[rgba(139,92,246,0.15)]">
+                  <span className="text-xs text-gray-500 uppercase block mb-1">Procura por</span>
+                  <span className="text-sm font-medium text-gray-200">
+                    {currentProfile.looking_for === 'M' ? 'Homens' : currentProfile.looking_for === 'F' ? 'Mulheres' : 'Todos'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="fixed bottom-[4rem] inset-x-0 p-6 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/90 to-transparent flex items-center justify-center gap-6 pointer-events-none">
+            <button
+              onClick={() => { setShowFullProfile(false); handlePass(); }}
+              className="pointer-events-auto w-16 h-16 rounded-full border-2 border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/10 hover:border-red-500/60 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f]"
+            >
+              <X className="w-7 h-7" />
+            </button>
+            <button
+              onClick={() => { setShowFullProfile(false); handleLike(true); }}
+              disabled={isLiking}
+              className="pointer-events-auto w-14 h-14 rounded-full border-2 border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/60 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f]"
+            >
+              <Sparkles className="w-6 h-6" />
+            </button>
+            <button
+              onClick={() => { setShowFullProfile(false); handleLike(false); }}
+              disabled={isLiking}
+              className="pointer-events-auto w-16 h-16 rounded-full gradient-bg flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all glow-purple"
+            >
+              <Heart className="w-7 h-7 fill-white" />
+            </button>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
@@ -200,12 +301,20 @@ export default function DiscoveryPage() {
 
                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
 
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <h2 className="text-2xl font-bold text-white mb-1">{currentProfile.display_name}</h2>
-                  <div className="flex items-center gap-1.5 text-white/70 text-sm">
-                    <MapPin className="w-4 h-4" />
-                    <span>{currentProfile.city}, {currentProfile.state}</span>
+                <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-between items-end">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-1">{currentProfile.display_name}</h2>
+                    <div className="flex items-center gap-1.5 text-white/70 text-sm">
+                      <MapPin className="w-4 h-4" />
+                      <span>{currentProfile.city}, {currentProfile.state}</span>
+                    </div>
                   </div>
+                  <button 
+                    onClick={() => setShowFullProfile(true)}
+                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                  >
+                    <Info className="w-5 h-5" />
+                  </button>
                 </div>
 
                 {swipeDirection === 'right' && (

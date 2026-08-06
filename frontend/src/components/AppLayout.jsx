@@ -10,7 +10,6 @@ export default function AppLayout({ children }) {
       to: '/discover',
       icon: Search,
       label: 'Explorar',
-      disabled: profile?.has_active_match,
     },
     {
       to: '/chat',

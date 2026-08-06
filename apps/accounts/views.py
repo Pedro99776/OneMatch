@@ -65,3 +65,31 @@ class ProfilePhotoDeleteView(generics.DestroyAPIView):
     
     def get_queryset(self):
         return ProfilePhoto.objects.filter(profile=self.request.user.profile)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+
+        if not current_password or not new_password:
+            return Response({"error": "current_password and new_password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(current_password):
+            return Response({"error": "Senha atual incorreta."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"success": "Senha alterada com sucesso."}, status=status.HTTP_200_OK)
+
+
+class DeleteAccountView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

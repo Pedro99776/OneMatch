@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil } from 'lucide-react';
+import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil, Lock, Shield, AlertTriangle, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
 import AppLayout from '../components/AppLayout';
@@ -11,6 +11,11 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
     bio: profile?.bio || '',
@@ -30,6 +35,34 @@ export default function ProfilePage() {
     setIsSaving(false);
     if (result.success) {
       setIsEditing(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setIsChangingPassword(true);
+    try {
+      await profileAPI.changePassword(passwordData);
+      alert('Senha alterada com sucesso!');
+      setShowPasswordModal(false);
+      setPasswordData({ current_password: '', new_password: '' });
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erro ao alterar senha.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      await profileAPI.deleteAccount();
+      logout();
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao excluir conta.');
+      setIsDeleting(false);
     }
   };
 
@@ -316,6 +349,46 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* Segurança da Conta */}
+          <div className="card p-6 mb-8">
+            <div className="flex items-center gap-2 mb-5">
+              <Shield className="w-5 h-5 text-purple-400" />
+              <h3 className="font-semibold">Segurança da Conta</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <button
+                onClick={() => setShowPasswordModal(true)}
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-[#16162a] border border-[rgba(139,92,246,0.15)] hover:border-[rgba(139,92,246,0.4)] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-medium text-gray-200">Alterar Senha</h4>
+                    <p className="text-xs text-gray-500">Atualize sua senha de acesso</p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-red-500/5 border border-red-500/10 hover:border-red-500/30 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-red-400" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-medium text-red-400">Excluir Conta</h4>
+                    <p className="text-xs text-red-400/60">Apagar perfil permanentemente</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={handleLogout}
             className="w-full py-3.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2"
@@ -325,6 +398,82 @@ export default function ProfilePage() {
           </button>
         </div>
       </div>
+
+      {/* Modal: Change Password */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6 animate-fade-in">
+          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full animate-fade-in-up">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold">Alterar Senha</h3>
+              <button onClick={() => setShowPasswordModal(false)} className="text-gray-500 hover:text-gray-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Senha Atual</label>
+                <input
+                  type="password"
+                  required
+                  className="input-field w-full text-sm"
+                  value={passwordData.current_password}
+                  onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Nova Senha</label>
+                <input
+                  type="password"
+                  required
+                  className="input-field w-full text-sm"
+                  value={passwordData.new_password}
+                  onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                />
+              </div>
+              
+              <button
+                type="submit"
+                disabled={isChangingPassword}
+                className="w-full btn-primary mt-6 !py-3 flex items-center justify-center"
+              >
+                {isChangingPassword ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Alteração'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Delete Account */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6 animate-fade-in">
+          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full animate-fade-in-up border border-red-500/20">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-red-400">Excluir Conta?</h3>
+            </div>
+            
+            <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+              Esta ação é <strong className="text-white">permanente e irreversível</strong>. Todos os seus dados, matches e mensagens serão apagados para sempre.
+            </p>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(false)} className="btn-secondary flex-1 !py-3">
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="flex-1 py-3 rounded-full bg-red-600 text-white font-semibold hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center justify-center"
+              >
+                {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sim, Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

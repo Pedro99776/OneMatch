@@ -79,6 +79,8 @@ export const profileAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   deletePhoto: (photoId) => api.delete(`/api/auth/profile/photos/${photoId}/`),
+  changePassword: (data) => api.post('/api/auth/profile/change-password/', data),
+  deleteAccount: () => api.delete('/api/auth/profile/delete-account/'),
 };
 
 // Discovery
