@@ -153,7 +153,7 @@ export default function ChatPage() {
       {/* Header */}
       <header className="flex items-center gap-4 px-5 py-4 glass-strong border-b border-[rgba(139,92,246,0.15)] flex-shrink-0">
         <button
-          onClick={() => navigate('/discover')}
+          onClick={() => navigate(-1)}
           className="text-gray-400 hover:text-gray-100 transition-colors"
         >
           <ArrowLeft className="w-6 h-6" />

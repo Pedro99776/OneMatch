@@ -1,13 +1,19 @@
 import { Heart, Shield, Sparkles, ArrowRight, Users, MessageCircleHeart } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LandingPage() {
   const [isVisible, setIsVisible] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
+
+  if (!loading && isAuthenticated) {
+    return <Navigate to="/discover" replace />;
+  }
 
   return (
     <div className="min-h-dvh bg-[#0a0a0f] overflow-hidden">
