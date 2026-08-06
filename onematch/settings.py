@@ -79,13 +79,14 @@ ASGI_APPLICATION = 'onematch.asgi.application'
 # =============================================
 # Banco de Dados — Preparado para Supabase
 # =============================================
-# Para conectar ao Supabase, basta definir as variáveis de ambiente:
-#   DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT
+# ATENÇÃO PARA DEPLOY (RENDER/VERCEL): 
+# Como o Supabase gratuito não suporta IPv4 na URL direta, você DEVE
+# usar o Connection Pooler (porta 6543) para evitar erro de rede.
 #
-# Exemplo Supabase:
-#   DATABASE_HOST=db.xxxxx.supabase.co
-#   DATABASE_PORT=5432
-#   DATABASE_USER=postgres
+# Exemplo Supabase (Connection Pooler):
+#   DATABASE_HOST=aws-0-sa-east-1.pooler.supabase.com
+#   DATABASE_PORT=6543
+#   DATABASE_USER=postgres.sua_referencia_de_projeto
 #   DATABASE_PASSWORD=sua-senha-do-supabase
 #   DATABASE_NAME=postgres
 # =============================================
@@ -131,7 +132,14 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # =============================================
 if os.environ.get('SUPABASE_S3_ACCESS_KEY_ID'):
     # Usa o Supabase Storage em produção / se configurado
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
     
     AWS_ACCESS_KEY_ID = os.environ.get('SUPABASE_S3_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.environ.get('SUPABASE_S3_SECRET_ACCESS_KEY')
@@ -143,9 +151,17 @@ if os.environ.get('SUPABASE_S3_ACCESS_KEY_ID'):
     AWS_S3_SIGNATURE_VERSION = 's3v4'
     AWS_S3_FILE_OVERWRITE = False
     
+    # O Supabase precisa de path-style addressing
+    AWS_S3_ADDRESSING_STYLE = "path"
+    
     # Para o frontend acessar as imagens publicamente via URL
     AWS_DEFAULT_ACL = 'public-read'
     AWS_QUERYSTRING_AUTH = False  # Deixa as URLs limpas sem assinatura temporária
+    
+    # Custom domain para servir URLs da API pública ao invés da S3 API
+    # Extrai o domínio base (ex: sskogiwqtdwpxffrhkwv.supabase.co) do endpoint
+    endpoint = AWS_S3_ENDPOINT_URL.replace('https://', '').split('/')[0]
+    AWS_S3_CUSTOM_DOMAIN = f"{endpoint}/storage/v1/object/public/{AWS_STORAGE_BUCKET_NAME}"
 else:
     # Fallback para desenvolvimento local
     MEDIA_URL = 'media/'
@@ -176,12 +192,10 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 }
 
-# Configuração do Django Channels (Redis)
+# Configuração do Django Channels (Local RAM)
+# Usando InMemoryChannelLayer removemos completamente a necessidade do Upstash (Redis)
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
-        },
-    },
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
 }

@@ -36,6 +36,32 @@ export default function DiscoveryPage() {
     loadFeed();
   }, [profile, navigate, loadFeed]);
 
+  // Polling para descobrir se recebeu um match de outra pessoa enquanto navega
+  useEffect(() => {
+    let interval;
+    const checkMatch = async () => {
+      try {
+        const { data } = await matchingAPI.getCurrentMatch();
+        if (data && data.id) {
+          // Descobre quem é a outra pessoa do match
+          const otherUser = data.user_1?.email !== profile?.user_email ? data.user_1 : data.user_2;
+          setShowMatch(otherUser);
+          await loadProfile(); // Atualiza o auth context
+        }
+      } catch (err) {
+        // Ignora erros de 204 (No Content)
+      }
+    };
+
+    if (!profile?.has_active_match && !showMatch) {
+      interval = setInterval(checkMatch, 5000); // Checa a cada 5 segundos
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [profile, showMatch, loadProfile]);
+
   const currentProfile = profiles[currentIndex];
 
   const handleLike = async (isSuperLike = false) => {

@@ -7,5 +7,5 @@ urlpatterns = [
     path('api/auth/', include('apps.accounts.urls')),
     path('api/matching/', include('apps.matching.urls')),
     path('api/discover/', include('apps.discovery.urls')),
-    # path('api/chat/', include('apps.chat.urls')),
+    path('api/chat/', include('apps.chat.urls')),
 ]

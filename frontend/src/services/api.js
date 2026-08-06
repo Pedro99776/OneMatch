@@ -93,5 +93,9 @@ export const matchingAPI = {
   getCurrentMatch: () => api.get('/api/matching/current/'),
   unmatch: (matchId) => api.post(`/api/matching/${matchId}/unmatch/`),
 };
-
 export default api;
+
+// Chat
+export const chatAPI = {
+  getMessages: (matchId) => api.get(`/api/chat/${matchId}/messages/`),
+};

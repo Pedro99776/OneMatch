@@ -185,29 +185,45 @@ export default function ProfilePage() {
           </div>
 
           {/* Photos Grid */}
-          {profile?.photos?.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-400 mb-3">Suas fotos</h3>
-              <div className="grid grid-cols-3 gap-3">
-                {profile.photos.map((photo) => (
-                  <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden group">
-                    <img src={photo.image} alt="" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => handleDeletePhoto(photo.id)}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-red-600"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    {photo.is_primary && (
-                      <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-xs text-white font-medium">
-                        Principal
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Suas fotos ({profile?.photos?.length || 0}/6)</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {[...Array(6)].map((_, index) => {
+                const photo = profile?.photos?.[index];
+                if (photo) {
+                  return (
+                    <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden group border border-[rgba(139,92,246,0.15)]">
+                      <img src={photo.image} alt="" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => handleDeletePhoto(photo.id)}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-red-600"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      {photo.is_primary && (
+                        <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider">
+                          Perfil
+                        </div>
+                      )}
+                    </div>
+                  );
+                } else {
+                  return (
+                    <label key={`empty-${index}`} className="relative aspect-square rounded-xl overflow-hidden border border-dashed border-[rgba(139,92,246,0.2)] bg-[#16162a]/50 hover:bg-[#16162a] flex items-center justify-center cursor-pointer transition-colors group">
+                      {isUploadingPhoto ? (
+                        <Loader2 className="w-5 h-5 text-gray-500 animate-spin" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-[rgba(139,92,246,0.1)] flex items-center justify-center group-hover:bg-[rgba(139,92,246,0.2)] transition-colors">
+                          <span className="text-purple-400 text-lg font-medium">+</span>
+                        </div>
+                      )}
+                      <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
+                    </label>
+                  );
+                }
+              })}
             </div>
-          )}
+          </div>
 
           {/* Profile Info */}
           <div className="card p-6 mb-6">

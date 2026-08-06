@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, ArrowLeft, Heart, Loader2, User, AlertTriangle, X } from 'lucide-react';
-import { matchingAPI } from '../services/api';
+import { matchingAPI, chatAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ChatPage() {
@@ -25,36 +25,67 @@ export default function ChatPage() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
+    let isMounted = true;
+    let localWs = null;
+
     const loadMatch = async () => {
       try {
         const { data } = await matchingAPI.getCurrentMatch();
         if (data && data.id) {
+          if (!isMounted) return;
           setMatch(data);
-          connectWebSocket(data.id);
+          
+          // Carrega histórico de mensagens primeiro
+          try {
+            const msgsRes = await chatAPI.getMessages(data.id);
+            if (msgsRes.data && isMounted) {
+              setMessages(msgsRes.data);
+            }
+          } catch (e) {
+            console.error('Error loading messages:', e);
+          }
+          
+          // Então conecta no WebSocket apenas se o componente ainda estiver montado
+          if (isMounted) {
+            localWs = connectWebSocket(data.id);
+          }
         } else {
           navigate('/discover');
         }
       } catch (err) {
-        if (err.response?.status === 204) {
+        if (err.response?.status === 204 && isMounted) {
           navigate('/discover');
         }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
     loadMatch();
 
     return () => {
-      if (wsRef.current) {
+      isMounted = false;
+      if (localWs) {
+        localWs.close();
+      } else if (wsRef.current) {
         wsRef.current.close();
       }
     };
   }, [navigate]);
 
   const connectWebSocket = (matchId) => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/chat/${matchId}/`;
+    const token = localStorage.getItem('access_token');
+    
+    // Obtém a URL base (mesma lógica do axios no api.js)
+    let wsHost;
+    if (import.meta.env.VITE_API_URL) {
+      // Ex: http://localhost:8000 -> ws://localhost:8000
+      wsHost = import.meta.env.VITE_API_URL.replace('http', 'ws');
+    } else {
+      // Se não tiver variável, por padrão o backend roda na porta 8000 localmente
+      wsHost = 'ws://127.0.0.1:8000';
+    }
+    
+    const wsUrl = `${wsHost}/ws/chat/${matchId}/?token=${token}`;
 
     const ws = new WebSocket(wsUrl);
 
@@ -73,6 +104,7 @@ export default function ChatPage() {
     };
 
     wsRef.current = ws;
+    return ws;
   };
 
   const sendMessage = (e) => {
