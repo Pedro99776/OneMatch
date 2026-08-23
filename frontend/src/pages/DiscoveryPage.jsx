@@ -36,8 +36,23 @@ export default function DiscoveryPage() {
 
   const handleSaveFilters = async (e) => {
     e.preventDefault();
+    
+    let minAge = parseInt(filterData.min_age_preference) || 18;
+    let maxAge = parseInt(filterData.max_age_preference) || 99;
+    
+    if (minAge < 18) minAge = 18;
+    if (maxAge < minAge) maxAge = minAge;
+    
+    const validatedData = {
+      ...filterData,
+      min_age_preference: minAge,
+      max_age_preference: maxAge
+    };
+    
+    setFilterData(validatedData);
+
     setIsSavingFilters(true);
-    await updateProfile(filterData);
+    await updateProfile(validatedData);
     setIsSavingFilters(false);
     setShowFilters(false);
     loadFeed();
@@ -217,9 +232,10 @@ export default function DiscoveryPage() {
   if (showFullProfile && currentProfile) {
     return (
       <AppLayout>
-        <div className="flex-1 overflow-y-auto bg-[#0a0a0f] relative hide-scrollbar">
-          {/* Header/Back button fixed at top */}
-          <button 
+        <div className="flex-1 overflow-y-auto bg-[#0a0a0f] relative hide-scrollbar flex justify-center">
+          <div className="w-full max-w-md relative pb-32">
+            {/* Header/Back button fixed at top */}
+            <button 
             onClick={() => setShowFullProfile(false)}
             className="fixed top-4 left-4 z-[60] w-11 h-11 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors backdrop-blur-md border border-white/20"
           >
@@ -463,10 +479,19 @@ export default function DiscoveryPage() {
                       type="range" 
                       name="max_distance_km" 
                       min="2" max="150" 
+                      list="distance-markers"
                       value={filterData.max_distance_km} 
                       onChange={(e) => setFilterData({...filterData, max_distance_km: parseInt(e.target.value)})} 
                       className="w-full accent-purple-500" 
                     />
+                    <datalist id="distance-markers">
+                      <option value="25"></option>
+                      <option value="50"></option>
+                      <option value="75"></option>
+                      <option value="100"></option>
+                      <option value="125"></option>
+                      <option value="150"></option>
+                    </datalist>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

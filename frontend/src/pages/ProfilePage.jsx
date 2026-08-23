@@ -37,8 +37,22 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
+    let minAge = parseInt(formData.min_age_preference) || 18;
+    let maxAge = parseInt(formData.max_age_preference) || 99;
+    
+    if (minAge < 18) minAge = 18;
+    if (maxAge < minAge) maxAge = minAge;
+    
+    const validatedData = {
+      ...formData,
+      min_age_preference: minAge,
+      max_age_preference: maxAge
+    };
+    
+    setFormData(validatedData);
+
     setIsSaving(true);
-    const result = await updateProfile(formData);
+    const result = await updateProfile(validatedData);
     setIsSaving(false);
     if (result.success) {
       setIsEditing(false);
@@ -406,14 +420,25 @@ export default function ProfilePage() {
                       <span className="text-xs text-purple-400 font-medium">{isEditing ? formData.max_distance_km : profile?.max_distance_km} km</span>
                     </div>
                     {isEditing ? (
-                      <input 
-                        type="range" 
-                        name="max_distance_km" 
-                        min="2" max="150" 
-                        value={formData.max_distance_km} 
-                        onChange={handleChange} 
-                        className="w-full accent-purple-500" 
-                      />
+                      <>
+                        <input 
+                          type="range" 
+                          name="max_distance_km" 
+                          min="2" max="150" 
+                          list="distance-markers-profile"
+                          value={formData.max_distance_km} 
+                          onChange={handleChange} 
+                          className="w-full accent-purple-500" 
+                        />
+                        <datalist id="distance-markers-profile">
+                          <option value="25"></option>
+                          <option value="50"></option>
+                          <option value="75"></option>
+                          <option value="100"></option>
+                          <option value="125"></option>
+                          <option value="150"></option>
+                        </datalist>
+                      </>
                     ) : (
                       <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
                         <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(profile?.max_distance_km / 150) * 100}%` }}></div>
