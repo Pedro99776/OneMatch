@@ -324,6 +324,7 @@ export default function DiscoveryPage() {
             </button>
           </div>
         </div>
+        </div>
       </AppLayout>
     );
   }
