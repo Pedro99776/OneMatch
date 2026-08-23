@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from .models import Match
@@ -12,6 +13,8 @@ User = get_user_model()
 
 class GiveLikeView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'like'
     
     def post(self, request, *args, **kwargs):
         to_user_id = request.data.get('to_user_id')

@@ -72,4 +72,4 @@ class SwipeFeedView(generics.ListAPIView):
         #     queryset = queryset.filter(city=user_city, state=user_state)
         # ────────────────────────────────────────────────────────────────
 
-        return queryset.order_by('?')[:20]
+        return queryset.prefetch_related('photos').order_by('?')[:20]

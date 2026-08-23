@@ -1,7 +1,9 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle
 from django.contrib.auth import get_user_model
+import mimetypes
 from .models import Profile, ProfilePhoto
 from .serializers import UserSerializer, ProfileSerializer, ProfilePhotoSerializer
 
@@ -30,6 +32,8 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (permissions.AllowAny,)
     serializer_class = UserSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'register'
 
 class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = ProfileSerializer
@@ -52,6 +56,17 @@ class ProfilePhotoUploadView(APIView):
                 {"error": "Limite máximo de 6 fotos atingido."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+            
+        # Validação de tamanho e tipo do arquivo
+        photo = request.FILES.get('photo')
+        if photo:
+            if photo.size > 5 * 1024 * 1024:
+                return Response({"error": "A imagem não pode ultrapassar 5MB."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            mime_type, _ = mimetypes.guess_type(photo.name)
+            allowed_types = ['image/jpeg', 'image/png', 'image/webp']
+            if not mime_type or mime_type not in allowed_types:
+                return Response({"error": "Apenas imagens JPG, PNG ou WEBP são permitidas."}, status=status.HTTP_400_BAD_REQUEST)
             
         serializer = ProfilePhotoSerializer(data=request.data)
         if serializer.is_valid():

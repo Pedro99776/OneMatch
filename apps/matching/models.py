@@ -12,7 +12,7 @@ class Like(models.Model):
     to_user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='likes_received')
     like_type = models.CharField(max_length=10, choices=LIKE_TYPE_CHOICES, default='normal')
     created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)  # False se expirou ou match foi feito
+    is_active = models.BooleanField(default=True, db_index=True)  # False se expirou ou match foi feito
     
     class Meta:
         unique_together = ('from_user', 'to_user')

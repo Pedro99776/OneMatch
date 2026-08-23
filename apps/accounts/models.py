@@ -32,8 +32,8 @@ class Profile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='profile')
     display_name = models.CharField(max_length=50, blank=True, default='')
     bio = models.TextField(max_length=500, blank=True)
-    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True, default='')
-    looking_for = models.CharField(max_length=1, choices=LOOKING_FOR_CHOICES, blank=True, default='')
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True, default='', db_index=True)
+    looking_for = models.CharField(max_length=1, choices=LOOKING_FOR_CHOICES, blank=True, default='', db_index=True)
     
     # Localização (MVP com Cidade/Estado, preparado para PostGIS no futuro)
     city = models.CharField(max_length=100, blank=True, default='')
@@ -42,7 +42,7 @@ class Profile(models.Model):
     longitude = models.FloatField(null=True, blank=True)
     
     # Status do match (Chave do conceito)
-    has_active_match = models.BooleanField(default=False)
+    has_active_match = models.BooleanField(default=False, db_index=True)
     
     def __str__(self):
         return f"{self.display_name} ({self.user.email})"

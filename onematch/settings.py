@@ -25,8 +25,9 @@ frontend_url = os.environ.get('FRONTEND_URL')
 if frontend_url:
     CORS_ALLOWED_ORIGINS.append(frontend_url)
 
-# Como alternativa rápida para não bloquear testes, permitimos todos provisoriamente
-CORS_ALLOW_ALL_ORIGINS = True
+# Permitimos todos apenas em ambiente de desenvolvimento se DEBUG for True.
+# Em produção, apenas CORS_ALLOWED_ORIGINS será respeitado.
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
 
 INSTALLED_APPS = [
@@ -184,6 +185,17 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/min',
+        'user': '100/min',
+        'login': '5/min',
+        'register': '3/min',
+        'like': '30/min'
+    }
 }
 
 from datetime import timedelta
