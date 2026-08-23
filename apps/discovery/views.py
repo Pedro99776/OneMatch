@@ -2,7 +2,9 @@ from rest_framework import generics, permissions
 from django.db.models import Q
 from apps.accounts.models import Profile
 from apps.accounts.serializers import ProfileSerializer
-from apps.matching.models import Like
+from django.utils import timezone
+from datetime import timedelta
+from apps.matching.models import Like, Pass
 
 
 class SwipeFeedView(generics.ListAPIView):
@@ -37,6 +39,13 @@ class SwipeFeedView(generics.ListAPIView):
         liked_user_ids = Like.objects.filter(
             from_user=user
         ).values_list('to_user_id', flat=True)
+        
+        # Passes nos últimos 90 dias
+        cutoff_date = timezone.now() - timedelta(days=90)
+        passed_user_ids = Pass.objects.filter(
+            from_user=user,
+            created_at__gte=cutoff_date
+        ).values_list('to_user_id', flat=True)
 
         # — Regra 4/5: Filtro base + perfis com match ativo excluídos
         queryset = Profile.objects.filter(
@@ -46,6 +55,8 @@ class SwipeFeedView(generics.ListAPIView):
             user=user                      # Exclui o próprio usuário
         ).exclude(
             user_id__in=liked_user_ids     # Exclui quem já recebeu like
+        ).exclude(
+            user_id__in=passed_user_ids    # Exclui passes recentes
         )
 
         # — Filtro bidirecional de gênero e preferências

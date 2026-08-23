@@ -45,3 +45,15 @@ class Match(models.Model):
                 name='unique_active_match_user2'
             ),
         ]
+
+class Pass(models.Model):
+    """Registro de rejeição (pass) no feed para não mostrar novamente."""
+    from_user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='passes_given')
+    to_user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='passes_received')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('from_user', 'to_user')
+        verbose_name = 'Pass'
+        verbose_name_plural = 'Passes'
+

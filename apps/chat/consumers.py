@@ -1,4 +1,5 @@
 import json
+import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
@@ -6,6 +7,7 @@ from .models import Conversation, Message
 from apps.matching.models import Match
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -40,7 +42,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Recebe mensagem do WebSocket (Frontend)
     async def receive(self, text_data):
-        print(f"[WS RECEIVE] Recebendo mensagem: {text_data}")
+        logger.debug(f"[WS RECEIVE] Recebendo mensagem: {text_data}")
         text_data_json = json.loads(text_data)
         message = text_data_json.get('message')
         
@@ -48,11 +50,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         # Salva no banco de dados e retorna os dados seguros
-        print("[WS RECEIVE] Salvando no banco de dados...")
+        logger.debug("[WS RECEIVE] Salvando no banco de dados...")
         msg_data = await self.save_message(self.user, self.match_id, message)
         
         if msg_data:
-            print(f"[WS RECEIVE] Mensagem salva com sucesso: {msg_data}. Enviando para o grupo {self.room_group_name}...")
+            logger.debug(f"[WS RECEIVE] Mensagem salva com sucesso: {msg_data}. Enviando para o grupo {self.room_group_name}...")
             # Envia a mensagem para a sala (group)
             await self.channel_layer.group_send(
                 self.room_group_name,
@@ -63,13 +65,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'sender_name': msg_data['sender_name']
                 }
             )
-            print("[WS RECEIVE] group_send finalizado!")
+            logger.debug("[WS RECEIVE] group_send finalizado!")
         else:
-            print("[WS RECEIVE] Falha ao salvar a mensagem (provavelmente match não está ativo).")
+            logger.warning("[WS RECEIVE] Falha ao salvar a mensagem (provavelmente match não está ativo).")
 
     # Recebe a mensagem do group (Redis) e manda pro WebSocket
     async def chat_message(self, event):
-        print(f"[WS CHAT_MESSAGE] Recebido do Redis, enviando para o cliente: {event}")
+        logger.debug(f"[WS CHAT_MESSAGE] Recebido do Redis, enviando para o cliente: {event}")
         message = event['message']
         sender_id = event['sender_id']
         sender_name = event['sender_name']
@@ -79,7 +81,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender_id': sender_id,
             'sender_name': sender_name
         }))
-        print("[WS CHAT_MESSAGE] Enviado com sucesso para o cliente!")
+        logger.debug("[WS CHAT_MESSAGE] Enviado com sucesso para o cliente!")
 
     @database_sync_to_async
     def is_match_member(self, user, match_id):

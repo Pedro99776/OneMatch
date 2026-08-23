@@ -92,6 +92,7 @@ export const discoveryAPI = {
 export const matchingAPI = {
   giveLike: (toUserId, isSuperLike = false) =>
     api.post('/api/matching/like/', { to_user_id: toUserId, is_super_like: isSuperLike }),
+  givePass: (toUserId) => api.post('/api/matching/pass/', { to_user_id: toUserId }),
   getCurrentMatch: () => api.get('/api/matching/current/'),
   unmatch: (matchId) => api.post(`/api/matching/${matchId}/unmatch/`),
 };

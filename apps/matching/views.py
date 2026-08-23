@@ -90,3 +90,38 @@ class UnmatchView(APIView):
             {"error": "Match não encontrado ou não pertence a você."},
             status=status.HTTP_404_NOT_FOUND
         )
+
+class PassView(APIView):
+    """Registra uma rejeição (pass) no feed."""
+    permission_classes = (permissions.IsAuthenticated,)
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'like'  # Usa o mesmo throttle de likes para evitar spam
+    
+    def post(self, request, *args, **kwargs):
+        to_user_id = request.data.get('to_user_id')
+        
+        if not to_user_id:
+            return Response(
+                {"error": "to_user_id é obrigatório."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            to_user = User.objects.get(id=to_user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Usuário não encontrado."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        if request.user == to_user:
+            return Response(
+                {"error": "Você não pode dar pass em si mesmo."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        from .models import Pass
+        # get_or_create para não duplicar caso o usuário mande vários requests
+        Pass.objects.get_or_create(from_user=request.user, to_user=to_user)
+        
+        return Response({"success": True}, status=status.HTTP_200_OK)

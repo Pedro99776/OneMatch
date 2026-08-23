@@ -105,8 +105,17 @@ export default function DiscoveryPage() {
     }
   };
 
-  const handlePass = () => {
+  const handlePass = async () => {
+    if (!currentProfile) return;
     setSwipeDirection('left');
+    
+    try {
+      // Chama a API silenciosamente sem bloquear a UI
+      matchingAPI.givePass(currentProfile.user_id).catch(console.error);
+    } catch (err) {
+      console.error(err);
+    }
+
     setTimeout(() => {
       setSwipeDirection(null);
       setCurrentIndex((prev) => prev + 1);
