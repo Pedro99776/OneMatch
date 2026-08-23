@@ -10,8 +10,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Retorna dados do usuário e status do perfil junto com os tokens JWT."""
 
     def validate(self, attrs):
-        data = super().validate(attrs)
-
+        from rest_framework_simplejwt.exceptions import AuthenticationFailed
+        try:
+            data = super().validate(attrs)
+        except AuthenticationFailed:
+            email = attrs.get(User.USERNAME_FIELD)
+            user_exists = User.objects.filter(**{User.USERNAME_FIELD: email}).exists() if email else False
+            if user_exists:
+                raise AuthenticationFailed("Senha incorreta")
+            else:
+                raise AuthenticationFailed("Usuário inválido")
+                
         user = self.user
         has_profile = Profile.objects.filter(
             user=user,
@@ -52,6 +61,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = (
             'id', 'user_id', 'display_name', 'bio', 'gender', 'looking_for', 
-            'city', 'state', 'has_active_match', 'photos'
+            'city', 'state', 'latitude', 'longitude', 'has_active_match', 'photos',
+            'max_distance_km', 'min_age_preference', 'max_age_preference'
         )
         read_only_fields = ('has_active_match', 'user_id')

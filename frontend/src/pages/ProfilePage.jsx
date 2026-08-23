@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil, Lock, Shield, AlertTriangle, X } from 'lucide-react';
+import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil, Lock, Shield, AlertTriangle, X, LocateFixed } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
+import { reverseGeocode } from '../services/geocoding';
 import AppLayout from '../components/AppLayout';
 
 export default function ProfilePage() {
@@ -23,7 +24,13 @@ export default function ProfilePage() {
     looking_for: profile?.looking_for || '',
     city: profile?.city || '',
     state: profile?.state || '',
+    latitude: profile?.latitude || null,
+    longitude: profile?.longitude || null,
+    max_distance_km: profile?.max_distance_km || 50,
+    min_age_preference: profile?.min_age_preference || 18,
+    max_age_preference: profile?.max_age_preference || 99,
   });
+  const [isLocating, setIsLocating] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -36,6 +43,34 @@ export default function ProfilePage() {
     if (result.success) {
       setIsEditing(false);
     }
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Seu navegador não suporta geolocalização.");
+      return;
+    }
+    
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      const geoResult = await reverseGeocode(lat, lng);
+      
+      setFormData(prev => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+        city: geoResult?.city || prev.city,
+        state: geoResult?.state || prev.state
+      }));
+      setIsLocating(false);
+    }, (error) => {
+      console.error(error);
+      alert("Não foi possível obter sua localização. Verifique as permissões do navegador.");
+      setIsLocating(false);
+    });
   };
 
   const handleChangePassword = async (e) => {
@@ -344,6 +379,66 @@ export default function ProfilePage() {
                   ) : (
                     <p className="text-gray-100 text-sm">{profile?.state || '—'}</p>
                   )}
+                </div>
+              </div>
+
+              {isEditing && (
+                <div className="pt-2">
+                  <button 
+                    type="button" 
+                    onClick={handleGetLocation} 
+                    disabled={isLocating}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm transition-colors"
+                  >
+                    {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
+                    Usar minha localização atual (GPS)
+                  </button>
+                </div>
+              )}
+              
+              <div className="pt-4 border-t border-[rgba(139,92,246,0.15)] mt-4">
+                <h4 className="text-sm font-semibold mb-4 text-gray-300">Preferências de Descoberta</h4>
+                
+                <div className="space-y-5">
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Distância Máxima</label>
+                      <span className="text-xs text-purple-400 font-medium">{isEditing ? formData.max_distance_km : profile?.max_distance_km} km</span>
+                    </div>
+                    {isEditing ? (
+                      <input 
+                        type="range" 
+                        name="max_distance_km" 
+                        min="2" max="150" 
+                        value={formData.max_distance_km} 
+                        onChange={handleChange} 
+                        className="w-full accent-purple-500" 
+                      />
+                    ) : (
+                      <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
+                        <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(profile?.max_distance_km / 150) * 100}%` }}></div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Mínima</label>
+                      {isEditing ? (
+                        <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference} onChange={handleChange} className="input-field text-sm" />
+                      ) : (
+                        <p className="text-gray-100 text-sm">{profile?.min_age_preference || '18'} anos</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Máxima</label>
+                      {isEditing ? (
+                        <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference} onChange={handleChange} className="input-field text-sm" />
+                      ) : (
+                        <p className="text-gray-100 text-sm">{profile?.max_age_preference || '99'} anos</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

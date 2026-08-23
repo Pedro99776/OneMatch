@@ -1,5 +1,6 @@
 from rest_framework import generics, permissions
-from django.db.models import Q
+from django.db.models import Q, F
+from django.db.models.functions import ACos, Cos, Radians, Sin
 from apps.accounts.models import Profile
 from apps.accounts.serializers import ProfileSerializer
 from django.utils import timezone
@@ -73,14 +74,58 @@ class SwipeFeedView(generics.ListAPIView):
                 Q(looking_for=my_gender) | Q(looking_for='A')
             )
 
-        # ─── GEO_FILTER (desabilitado no MVP) ───────────────────────────
-        # Para ativar: descomentar as linhas abaixo e remover este comentário.
-        # Recomendação futura: migrar para PostGIS e usar filtro por distância (km).
-        #
-        # user_city = getattr(getattr(user, 'profile', None), 'city', '')
-        # user_state = getattr(getattr(user, 'profile', None), 'state', '')
-        # if user_city and user_state:
-        #     queryset = queryset.filter(city=user_city, state=user_state)
+        # — Filtros de Idade (Bidirecional)
+        if user.date_of_birth:
+            today = timezone.now().date()
+            # Calcula minha idade
+            my_age = today.year - user.date_of_birth.year - ((today.month, today.day) < (user.date_of_birth.month, user.date_of_birth.day))
+            
+            # Filtro 1: O outro me aceita (minha idade está dentro da preferência do outro)
+            queryset = queryset.filter(
+                min_age_preference__lte=my_age,
+                max_age_preference__gte=my_age
+            )
+
+        # Filtro 2: Eu aceito o outro (a data de nascimento do outro está na minha faixa)
+        my_profile = getattr(user, 'profile', None)
+        if my_profile:
+            min_age = my_profile.min_age_preference
+            max_age = my_profile.max_age_preference
+            
+            today = timezone.now().date()
+            try:
+                min_birth_date = today.replace(year=today.year - max_age - 1) + timedelta(days=1)
+            except ValueError:
+                min_birth_date = today.replace(year=today.year - max_age - 1, day=28) + timedelta(days=1)
+                
+            try:
+                max_birth_date = today.replace(year=today.year - min_age)
+            except ValueError:
+                max_birth_date = today.replace(year=today.year - min_age, day=28)
+                
+            queryset = queryset.filter(
+                user__date_of_birth__gte=min_birth_date,
+                user__date_of_birth__lte=max_birth_date
+            )
+
+        # ─── HA VERSINE FILTER (MVP) ───────────────────────────
+        # NOTA: Para milhares de usuários numa mesma região, esta fórmula pode ficar lenta
+        # por recalcular a distância em cada linha (Full Table Scan sem índice espacial).
+        # ESCALABILIDADE: Quando tiver tração, habilite a extensão PostGIS no Supabase,
+        # altere lat/lon para um PointField e use `distance__lte` nativo do GeoDjango.
+        
+        user_lat = getattr(my_profile, 'latitude', None)
+        user_lon = getattr(my_profile, 'longitude', None)
+        user_max_dist = getattr(my_profile, 'max_distance_km', 50)
+        
+        if user_lat is not None and user_lon is not None:
+            queryset = queryset.annotate(
+                distance=ACos(
+                    Cos(Radians(user_lat)) * Cos(Radians(F('latitude'))) *
+                    Cos(Radians(F('longitude')) - Radians(user_lon)) +
+                    Sin(Radians(user_lat)) * Sin(Radians(F('latitude')))
+                ) * 6371.0
+            ).filter(distance__lte=user_max_dist)
         # ────────────────────────────────────────────────────────────────
 
         return queryset.prefetch_related('photos').order_by('?')[:20]

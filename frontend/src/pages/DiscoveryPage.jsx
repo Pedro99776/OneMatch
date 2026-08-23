@@ -35,29 +35,36 @@ export default function DiscoveryPage() {
     }
   }, [profile, loadFeed]);
 
-  // Polling para descobrir se recebeu um match de outra pessoa enquanto navega
+  // WebSocket para notificações em tempo real (substitui o polling)
   useEffect(() => {
-    let interval;
-    const checkMatch = async () => {
+    if (profile?.has_active_match || showMatch) return;
+
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('http://', '').replace('https://', '') : window.location.host;
+    
+    const ws = new WebSocket(`${protocol}//${host}/ws/notifications/?token=${token}`);
+    
+    ws.onmessage = async (event) => {
       try {
-        const { data } = await matchingAPI.getCurrentMatch();
-        if (data && data.id) {
-          // Descobre quem é a outra pessoa do match
-          const otherUser = data.user_1?.email !== profile?.user_email ? data.user_1 : data.user_2;
-          setShowMatch(otherUser);
-          await loadProfile(); // Atualiza o auth context
+        const data = JSON.parse(event.data);
+        if (data.type === 'match_created') {
+          const matchResponse = await matchingAPI.getCurrentMatch();
+          if (matchResponse.data && matchResponse.data.id) {
+            const otherUser = matchResponse.data.user_1?.email !== profile?.user_email ? matchResponse.data.user_1 : matchResponse.data.user_2;
+            setShowMatch(otherUser);
+            await loadProfile();
+          }
         }
       } catch (err) {
-        // Ignora erros de 204 (No Content)
+        console.error('Error handling WS notification:', err);
       }
     };
 
-    if (!profile?.has_active_match && !showMatch) {
-      interval = setInterval(checkMatch, 5000); // Checa a cada 5 segundos
-    }
-
     return () => {
-      if (interval) clearInterval(interval);
+      ws.close();
     };
   }, [profile, showMatch, loadProfile]);
 

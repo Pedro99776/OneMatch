@@ -41,7 +41,14 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     
     def get_object(self):
         # Retorna o perfil do usuário logado ou cria um vazio
-        profile, created = Profile.objects.get_or_create(user=self.request.user)
+        profile, created = Profile.objects.get_or_create(
+            user=self.request.user,
+            defaults={
+                'max_distance_km': 50,
+                'min_age_preference': 18,
+                'max_age_preference': 99
+            }
+        )
         return profile
 
 class ProfilePhotoUploadView(APIView):

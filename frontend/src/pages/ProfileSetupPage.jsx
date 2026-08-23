@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Loader2, ArrowRight, Sparkles } from 'lucide-react';
+import { MapPin, Loader2, ArrowRight, Sparkles, LocateFixed } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { reverseGeocode } from '../services/geocoding';
 
 export default function ProfileSetupPage() {
   const [formData, setFormData] = useState({
@@ -11,7 +12,13 @@ export default function ProfileSetupPage() {
     looking_for: '',
     city: '',
     state: '',
+    latitude: null,
+    longitude: null,
+    max_distance_km: 50,
+    min_age_preference: 18,
+    max_age_preference: 99,
   });
+  const [isLocating, setIsLocating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const { updateProfile } = useAuth();
@@ -20,6 +27,35 @@ export default function ProfileSetupPage() {
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Seu navegador não suporta geolocalização.");
+      return;
+    }
+    
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      const geoResult = await reverseGeocode(lat, lng);
+      
+      setFormData(prev => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+        city: geoResult?.city || prev.city,
+        state: geoResult?.state || prev.state
+      }));
+      setIsLocating(false);
+      setError('');
+    }, (error) => {
+      console.error(error);
+      alert("Não foi possível obter sua localização. Verifique as permissões do navegador.");
+      setIsLocating(false);
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -197,6 +233,51 @@ export default function ProfileSetupPage() {
                   className="input-field text-sm"
                   required
                 />
+              </div>
+            </div>
+
+            <div>
+              <button 
+                type="button" 
+                onClick={handleGetLocation} 
+                disabled={isLocating}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm transition-colors"
+              >
+                {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
+                Preencher com minha localização (GPS)
+              </button>
+            </div>
+
+            {/* Discovery Preferences */}
+            <div className="pt-4 border-t border-[rgba(139,92,246,0.15)] mt-4">
+              <h4 className="text-sm font-medium text-gray-400 mb-4">Suas Preferências de Busca</h4>
+              
+              <div className="space-y-6">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-400">Distância Máxima</label>
+                    <span className="text-sm text-purple-400 font-medium">{formData.max_distance_km} km</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    name="max_distance_km" 
+                    min="2" max="150" 
+                    value={formData.max_distance_km} 
+                    onChange={handleChange} 
+                    className="w-full accent-purple-500" 
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">Idade Mínima</label>
+                    <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference} onChange={handleChange} className="input-field text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-2">Idade Máxima</label>
+                    <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference} onChange={handleChange} className="input-field text-sm" />
+                  </div>
+                </div>
               </div>
             </div>
 

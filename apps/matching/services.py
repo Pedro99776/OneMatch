@@ -119,6 +119,25 @@ class MatchService:
             # 4. Cria a sala de chat (Conversation)
             Conversation.objects.create(match=match)
             
+            # 5. Notifica via WebSocket
+            try:
+                from channels.layers import get_channel_layer
+                from asgiref.sync import async_to_sync
+                channel_layer = get_channel_layer()
+                if channel_layer:
+                    notification = {
+                        'type': 'notification_message',
+                        'message': {
+                            'type': 'match_created',
+                            'match_id': match.id
+                        }
+                    }
+                    async_to_sync(channel_layer.group_send)(f'user_notifications_{from_user.id}', notification)
+                    async_to_sync(channel_layer.group_send)(f'user_notifications_{to_user.id}', notification)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to send notification: {e}")
+            
             return {
                 "success": True,
                 "message": "É um Match!",

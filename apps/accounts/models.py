@@ -41,6 +41,11 @@ class Profile(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     
+    # Preferências de Descoberta
+    max_distance_km = models.IntegerField(default=50)
+    min_age_preference = models.IntegerField(default=18)
+    max_age_preference = models.IntegerField(default=99)
+    
     # Status do match (Chave do conceito)
     has_active_match = models.BooleanField(default=False, db_index=True)
     
