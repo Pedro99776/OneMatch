@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, X, MapPin, Sparkles, Loader2, RefreshCw, User, Info, ArrowLeft, MessageCircle } from 'lucide-react';
+import { Heart, X, MapPin, Sparkles, Loader2, RefreshCw, User, Info, ArrowLeft, MessageCircle, SlidersHorizontal, Save } from 'lucide-react';
 import { discoveryAPI, matchingAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import AppLayout from '../components/AppLayout';
@@ -13,8 +13,35 @@ export default function DiscoveryPage() {
   const [swipeDirection, setSwipeDirection] = useState(null);
   const [showMatch, setShowMatch] = useState(null);
   const [showFullProfile, setShowFullProfile] = useState(false);
-  const { profile, loadProfile } = useAuth();
+  const [showFilters, setShowFilters] = useState(false);
+  const { profile, loadProfile, updateProfile } = useAuth();
+  const [filterData, setFilterData] = useState({
+    max_distance_km: profile?.max_distance_km || 50,
+    min_age_preference: profile?.min_age_preference || 18,
+    max_age_preference: profile?.max_age_preference || 99,
+  });
+  const [isSavingFilters, setIsSavingFilters] = useState(false);
   const navigate = useNavigate();
+
+  // Sincroniza filterData caso o profile seja atualizado em background
+  useEffect(() => {
+    if (profile) {
+      setFilterData({
+        max_distance_km: profile.max_distance_km,
+        min_age_preference: profile.min_age_preference,
+        max_age_preference: profile.max_age_preference,
+      });
+    }
+  }, [profile]);
+
+  const handleSaveFilters = async (e) => {
+    e.preventDefault();
+    setIsSavingFilters(true);
+    await updateProfile(filterData);
+    setIsSavingFilters(false);
+    setShowFilters(false);
+    loadFeed();
+  };
 
   const loadFeed = useCallback(async () => {
     setIsLoading(true);
@@ -190,50 +217,66 @@ export default function DiscoveryPage() {
   if (showFullProfile && currentProfile) {
     return (
       <AppLayout>
-        <div className="flex-1 overflow-y-auto bg-[#0a0a0f] hide-scrollbar relative">
-          <div className="relative w-full aspect-[3/4] max-h-[65vh]">
-            <button 
-              onClick={() => setShowFullProfile(false)}
-              className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors backdrop-blur-sm border border-white/10"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
+        <div className="flex-1 overflow-y-auto bg-[#0a0a0f] relative hide-scrollbar">
+          {/* Header/Back button fixed at top */}
+          <button 
+            onClick={() => setShowFullProfile(false)}
+            className="fixed top-4 left-4 z-[60] w-11 h-11 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors backdrop-blur-md border border-white/20"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          
+          {/* Photos */}
+          <div className="w-full flex flex-col gap-1 pb-32">
             {currentProfile.photos && currentProfile.photos.length > 0 ? (
-              <div className="w-full h-full flex overflow-x-auto snap-x snap-mandatory hide-scrollbar">
-                {currentProfile.photos.map((photo) => (
-                  <img key={photo.id} src={photo.image} alt="Profile" className="w-full h-full object-cover shrink-0 snap-center" />
-                ))}
-              </div>
+              currentProfile.photos.map((photo, index) => (
+                <div key={photo.id} className="relative w-full aspect-[4/5] bg-[#1a1a2e]">
+                  <img src={photo.image} alt="Profile" className="w-full h-full object-cover" />
+                  
+                  {/* Overlay for the first photo to show name/info */}
+                  {index === 0 && (
+                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/80 to-transparent flex flex-col justify-end p-6">
+                      <h2 className="text-3xl font-bold text-white mb-1">{currentProfile.display_name}</h2>
+                      <div className="flex items-center gap-1.5 text-purple-300 font-medium">
+                        <MapPin className="w-4 h-4" />
+                        <span>{currentProfile.city}, {currentProfile.state}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
             ) : (
-              <div className="w-full h-full bg-[#1a1a2e] flex items-center justify-center">
-                <User className="w-24 h-24 text-gray-600/30" />
+              <div className="w-full aspect-[4/5] bg-[#1a1a2e] flex flex-col justify-end p-6 relative">
+                <User className="w-24 h-24 text-gray-600/30 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                <h2 className="text-3xl font-bold text-white mb-1 relative z-10">{currentProfile.display_name}</h2>
+                <div className="flex items-center gap-1.5 text-purple-300 font-medium relative z-10">
+                  <MapPin className="w-4 h-4" />
+                  <span>{currentProfile.city}, {currentProfile.state}</span>
+                </div>
               </div>
             )}
-            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#0a0a0f] to-transparent pointer-events-none" />
-          </div>
-          <div className="px-6 py-4 -mt-8 relative z-10 mb-28">
-            <h2 className="text-3xl font-bold text-white mb-2">{currentProfile.display_name}</h2>
-            <div className="flex items-center gap-1.5 text-purple-400 mb-6">
-              <MapPin className="w-4 h-4" />
-              <span>{currentProfile.city}, {currentProfile.state}</span>
-            </div>
             
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Sobre</h3>
-                <p className="text-gray-300 text-sm leading-relaxed">{currentProfile.bio || 'Nenhuma bio definida.'}</p>
-              </div>
+            {/* Bio and Info Sections */}
+            <div className="px-6 py-6 bg-[#0a0a0f]">
+              {currentProfile.bio && (
+                <div className="mb-8">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sobre mim</h3>
+                  <p className="text-gray-200 text-sm leading-relaxed bg-[#1a1a2e] p-5 rounded-2xl border border-[rgba(139,92,246,0.1)]">
+                    {currentProfile.bio}
+                  </p>
+                </div>
+              )}
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-[rgba(139,92,246,0.15)]">
-                  <span className="text-xs text-gray-500 uppercase block mb-1">Gênero</span>
-                  <span className="text-sm font-medium text-gray-200">
+                <div className="bg-[#1a1a2e] rounded-2xl p-4 border border-[rgba(139,92,246,0.1)] flex flex-col items-center justify-center text-center">
+                  <span className="text-xs text-gray-500 uppercase font-semibold mb-1">Gênero</span>
+                  <span className="text-sm font-bold text-gray-200">
                     {currentProfile.gender === 'M' ? 'Masculino' : currentProfile.gender === 'F' ? 'Feminino' : 'Não especificado'}
                   </span>
                 </div>
-                <div className="bg-[#1a1a2e] rounded-xl p-4 border border-[rgba(139,92,246,0.15)]">
-                  <span className="text-xs text-gray-500 uppercase block mb-1">Procura por</span>
-                  <span className="text-sm font-medium text-gray-200">
+                <div className="bg-[#1a1a2e] rounded-2xl p-4 border border-[rgba(139,92,246,0.1)] flex flex-col items-center justify-center text-center">
+                  <span className="text-xs text-gray-500 uppercase font-semibold mb-1">Busca por</span>
+                  <span className="text-sm font-bold text-gray-200">
                     {currentProfile.looking_for === 'M' ? 'Homens' : currentProfile.looking_for === 'F' ? 'Mulheres' : 'Todos'}
                   </span>
                 </div>
@@ -241,26 +284,27 @@ export default function DiscoveryPage() {
             </div>
           </div>
           
-          <div className="fixed bottom-[4rem] inset-x-0 p-6 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/90 to-transparent flex items-center justify-center gap-6 pointer-events-none">
+          {/* Action Buttons */}
+          <div className="fixed bottom-[5rem] inset-x-0 p-4 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/90 to-transparent flex items-center justify-center gap-6 pointer-events-none z-[60]">
             <button
               onClick={() => { setShowFullProfile(false); handlePass(); }}
-              className="pointer-events-auto w-16 h-16 rounded-full border-2 border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/10 hover:border-red-500/60 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f]"
+              className="pointer-events-auto w-14 h-14 rounded-full border-2 border-red-500/40 flex items-center justify-center text-red-400 hover:bg-red-500/20 hover:border-red-500 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f] shadow-lg shadow-red-500/20"
             >
-              <X className="w-7 h-7" />
+              <X className="w-6 h-6" />
             </button>
             <button
               onClick={() => { setShowFullProfile(false); handleLike(true); }}
               disabled={isLiking}
-              className="pointer-events-auto w-14 h-14 rounded-full border-2 border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/60 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f]"
+              className="pointer-events-auto w-12 h-12 rounded-full border-2 border-purple-500/40 flex items-center justify-center text-purple-400 hover:bg-purple-500/20 hover:border-purple-500 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f] shadow-lg shadow-purple-500/20"
             >
-              <Sparkles className="w-6 h-6" />
+              <Sparkles className="w-5 h-5" />
             </button>
             <button
               onClick={() => { setShowFullProfile(false); handleLike(false); }}
               disabled={isLiking}
-              className="pointer-events-auto w-16 h-16 rounded-full gradient-bg flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all glow-purple"
+              className="pointer-events-auto w-14 h-14 rounded-full gradient-bg flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all glow-purple"
             >
-              <Heart className="w-7 h-7 fill-white" />
+              <Heart className="w-6 h-6 fill-white" />
             </button>
           </div>
         </div>
@@ -270,7 +314,17 @@ export default function DiscoveryPage() {
 
   return (
     <AppLayout>
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 relative">
+        {/* Filters Button */}
+        <div className="absolute top-4 right-6 z-10">
+          <button 
+            onClick={() => setShowFilters(true)}
+            className="w-10 h-10 rounded-full bg-[#1a1a2e] border border-[rgba(139,92,246,0.2)] flex items-center justify-center text-purple-400 hover:bg-[rgba(139,92,246,0.1)] transition-colors shadow-lg"
+          >
+            <SlidersHorizontal className="w-5 h-5" />
+          </button>
+        </div>
+
         {isLoading ? (
           <div className="flex flex-col items-center gap-4 animate-fade-in">
             <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
@@ -384,6 +438,73 @@ export default function DiscoveryPage() {
             <p className="text-center text-gray-500 text-xs mt-6">
               {currentIndex + 1} / {profiles.length} perfis
             </p>
+          </div>
+        )}
+
+        {/* Filters Modal */}
+        {showFilters && (
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
+            <div className="bg-[#0a0a0f] rounded-t-3xl w-full border-t border-[rgba(139,92,246,0.2)] shadow-[0_-10px_40px_rgba(139,92,246,0.1)]">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold font-heading">Filtros de Busca</h3>
+                  <button onClick={() => setShowFilters(false)} className="text-gray-500 hover:text-white transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveFilters} className="space-y-6">
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-sm font-medium text-gray-300">Distância Máxima</label>
+                      <span className="text-sm text-purple-400 font-bold">{filterData.max_distance_km} km</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      name="max_distance_km" 
+                      min="2" max="150" 
+                      value={filterData.max_distance_km} 
+                      onChange={(e) => setFilterData({...filterData, max_distance_km: parseInt(e.target.value)})} 
+                      className="w-full accent-purple-500" 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Idade Mínima</label>
+                      <input 
+                        type="number" 
+                        min="18" max="99" 
+                        value={filterData.min_age_preference} 
+                        onChange={(e) => setFilterData({...filterData, min_age_preference: parseInt(e.target.value)})} 
+                        className="input-field text-sm" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Idade Máxima</label>
+                      <input 
+                        type="number" 
+                        min="18" max="99" 
+                        value={filterData.max_age_preference} 
+                        onChange={(e) => setFilterData({...filterData, max_age_preference: parseInt(e.target.value)})} 
+                        className="input-field text-sm" 
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingFilters}
+                    className="w-full btn-primary !py-3.5 mt-4"
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      {isSavingFilters ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                      Aplicar Filtros
+                    </span>
+                  </button>
+                </form>
+              </div>
+            </div>
           </div>
         )}
       </div>
