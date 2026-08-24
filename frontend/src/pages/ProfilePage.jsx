@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil, Lock, Shield, AlertTriangle, X, LocateFixed } from 'lucide-react';
+import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil, Lock, Shield, AlertTriangle, X, LocateFixed, MessageSquareQuote } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
 import { reverseGeocode } from '../services/geocoding';
 import AppLayout from '../components/AppLayout';
+import { educationOptions, religionOptions, politicsOptions, childrenOptions } from '../data/choices';
 
 export default function ProfilePage() {
   const { profile, updateProfile, logout, loadProfile } = useAuth();
@@ -18,6 +19,7 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profileError, setProfileError] = useState('');
+  
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
     bio: profile?.bio || '',
@@ -30,8 +32,28 @@ export default function ProfilePage() {
     max_distance_km: profile?.max_distance_km || 50,
     min_age_preference: profile?.min_age_preference || 18,
     max_age_preference: profile?.max_age_preference || 99,
+    height_cm: profile?.height_cm || '',
+    religion: profile?.religion || '',
+    politics: profile?.politics || '',
+    children: profile?.children || '',
+    education: profile?.education || '',
+    university: profile?.university || '',
+    job_title: profile?.job_title || '',
+    company: profile?.company || '',
   });
+
   const [isLocating, setIsLocating] = useState(false);
+
+  // Sync state if profile loads later
+  useEffect(() => {
+    if (profile) {
+      setFormData(prev => ({
+        ...prev,
+        ...profile,
+        height_cm: profile.height_cm || '',
+      }));
+    }
+  }, [profile]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -54,11 +76,10 @@ export default function ProfilePage() {
     const validatedData = {
       ...formData,
       min_age_preference: minAge,
-      max_age_preference: maxAge
+      max_age_preference: maxAge,
+      height_cm: formData.height_cm === '' ? null : formData.height_cm,
     };
     
-    setFormData(validatedData);
-
     setIsSaving(true);
     const result = await updateProfile(validatedData);
     setIsSaving(false);
@@ -72,14 +93,11 @@ export default function ProfilePage() {
       alert("Seu navegador não suporta geolocalização.");
       return;
     }
-    
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(async (position) => {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
-      
       const geoResult = await reverseGeocode(lat, lng);
-      
       setFormData(prev => ({
         ...prev,
         latitude: lat,
@@ -93,6 +111,78 @@ export default function ProfilePage() {
       alert("Não foi possível obter sua localização. Verifique as permissões do navegador.");
       setIsLocating(false);
     });
+  };
+
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          if (width > height) {
+            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+          } else {
+            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error('Canvas is empty'));
+            resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+          }, 'image/jpeg', 0.8);
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert('Limite máximo de 5MB.'); return; }
+    setIsUploadingPhoto(true);
+    try {
+      const compressedFile = await compressImage(file);
+      const fd = new FormData();
+      fd.append('image', compressedFile);
+      if (!profile?.photos || profile.photos.length === 0) fd.append('is_primary', 'true');
+      await profileAPI.uploadPhoto(fd);
+      await loadProfile();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao enviar foto.');
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = null;
+    }
+  };
+
+  const handleDeletePhoto = async (photoId) => {
+    try {
+      await profileAPI.deletePhoto(photoId);
+      await loadProfile();
+    } catch (err) {
+      alert('Erro ao excluir a foto.');
+    }
+  };
+
+  const handleDeletePrompt = async (promptId) => {
+    try {
+      await profileAPI.deletePrompt(promptId);
+      await loadProfile();
+    } catch (err) {
+      alert('Erro ao excluir prompt.');
+    }
   };
 
   const handleChangePassword = async (e) => {
@@ -117,164 +207,43 @@ export default function ProfilePage() {
       logout();
       navigate('/');
     } catch (err) {
-      console.error(err);
       alert('Erro ao excluir conta.');
       setIsDeleting(false);
     }
   };
 
-  const compressImage = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          
-          // Max dimensions
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
-          
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error('Canvas is empty'));
-                return;
-              }
-              const compressedFile = new File([blob], file.name, {
-                type: 'image/jpeg',
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
-            },
-            'image/jpeg',
-            0.8 // 80% quality
-          );
-        };
-        img.onerror = (error) => reject(error);
-      };
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const handlePhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Check size limit (5MB limit before compression as a safety check)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem é muito grande. O limite máximo é 5MB.');
-      return;
-    }
-
-    setIsUploadingPhoto(true);
-    try {
-      const compressedFile = await compressImage(file);
-      
-      const fd = new FormData();
-      fd.append('image', compressedFile);
-      fd.append('is_primary', 'true');
-      
-      await profileAPI.uploadPhoto(fd);
-      await loadProfile();
-    } catch (err) {
-      console.error('Error uploading photo:', err);
-      alert('Erro ao enviar foto. Tente novamente.');
-    } finally {
-      setIsUploadingPhoto(false);
-      // Reset input so the same file can be selected again
-      e.target.value = null;
-    }
-  };
-
-  const handleDeletePhoto = async (photoId) => {
-    try {
-      await profileAPI.deletePhoto(photoId);
-      await loadProfile();
-    } catch (err) {
-      console.error('Error deleting photo:', err);
-      alert('Erro ao excluir a foto.');
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
   const genderLabels = { M: 'Masculino', F: 'Feminino' };
   const lookingForLabels = { M: 'Homens', F: 'Mulheres', A: 'Todos' };
+  
+  const getChoiceLabel = (choices, val) => choices.find(c => c.value === val)?.label || '—';
 
   return (
     <AppLayout>
       <div className="flex-1 overflow-y-auto px-6 py-8">
         <div className="max-w-lg mx-auto animate-fade-in-up">
-          {/* Profile Header */}
+          
           <div className="text-center mb-8">
             <div className="relative inline-block mb-5">
               <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-600 to-red-600 p-0.5">
                 <div className="w-full h-full rounded-full bg-[#1a1a2e] flex items-center justify-center overflow-hidden">
                   {profile?.photos?.length > 0 ? (
-                    <img
-                      src={profile.photos.find(p => p.is_primary)?.image || profile.photos[0].image}
-                      alt={profile.display_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-12 h-12 text-gray-500" />
-                  )}
+                    <img src={profile.photos.find(p => p.is_primary)?.image || profile.photos[0].image} alt="" className="w-full h-full object-cover" />
+                  ) : <User className="w-12 h-12 text-gray-500" />}
                 </div>
               </div>
               <label className="absolute bottom-0 right-0 w-9 h-9 rounded-full gradient-bg flex items-center justify-center cursor-pointer hover:scale-110 transition-transform border-2 border-[#0a0a0f]">
-                {isUploadingPhoto ? (
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
-                ) : (
-                  <Camera className="w-4 h-4 text-white" />
-                )}
-                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                {isUploadingPhoto ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <Camera className="w-4 h-4 text-white" />}
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
               </label>
             </div>
-
             <h1 className="text-2xl font-bold font-heading">{profile?.display_name || 'Seu Perfil'}</h1>
             {profile?.city && (
               <div className="flex items-center justify-center gap-1.5 text-gray-400 text-sm mt-1">
-                <MapPin className="w-4 h-4" />
-                <span>{profile.city}, {profile.state}</span>
+                <MapPin className="w-4 h-4" /><span>{profile.city}, {profile.state}</span>
               </div>
             )}
-
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full mt-4 text-sm ${
-              profile?.has_active_match
-                ? 'bg-red-500/10 border border-red-500/20 text-red-400'
-                : 'bg-green-500/10 border border-green-500/20 text-green-400'
-            }`}>
-              <Heart className="w-4 h-4" />
-              {profile?.has_active_match ? 'Match ativo' : 'Disponível'}
-            </div>
           </div>
 
-          {/* Photos Grid */}
           <div className="mb-8">
             <h3 className="text-sm font-medium text-gray-400 mb-3">Suas fotos ({profile?.photos?.length || 0}/6)</h3>
             <div className="grid grid-cols-3 gap-3">
@@ -284,29 +253,16 @@ export default function ProfilePage() {
                   return (
                     <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden group border border-[rgba(139,92,246,0.15)]">
                       <img src={photo.image} alt="" className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => handleDeletePhoto(photo.id)}
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-red-600"
-                      >
+                      <button onClick={() => handleDeletePhoto(photo.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-red-600">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                      {photo.is_primary && (
-                        <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider">
-                          Perfil
-                        </div>
-                      )}
+                      {photo.is_primary && <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider">Perfil</div>}
                     </div>
                   );
                 } else {
                   return (
                     <label key={`empty-${index}`} className="relative aspect-square rounded-xl overflow-hidden border border-dashed border-[rgba(139,92,246,0.2)] bg-[#16162a]/50 hover:bg-[#16162a] flex items-center justify-center cursor-pointer transition-colors group">
-                      {isUploadingPhoto ? (
-                        <Loader2 className="w-5 h-5 text-gray-500 animate-spin" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-[rgba(139,92,246,0.1)] flex items-center justify-center group-hover:bg-[rgba(139,92,246,0.2)] transition-colors">
-                          <span className="text-purple-400 text-lg font-medium">+</span>
-                        </div>
-                      )}
+                      {isUploadingPhoto ? <Loader2 className="w-5 h-5 text-gray-500 animate-spin" /> : <span className="text-purple-400 text-lg font-medium">+</span>}
                       <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
                     </label>
                   );
@@ -315,46 +271,44 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Profile Info */}
+          {profile?.prompts?.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Seus Prompts ({profile.prompts.length}/3)</h3>
+              <div className="space-y-3">
+                {profile.prompts.map(prompt => (
+                  <div key={prompt.id} className="bg-[#16162a] border border-[rgba(139,92,246,0.2)] rounded-xl p-4 relative group">
+                    <button onClick={() => handleDeletePrompt(prompt.id)} className="absolute top-3 right-3 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <div className="text-xs font-semibold text-purple-300 mb-1 pr-6">{prompt.question}</div>
+                    <div className="text-sm text-gray-200">{prompt.answer}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="card p-6 mb-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-semibold">Informações do perfil</h3>
               <button
                 onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                 disabled={isSaving}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  isEditing
-                    ? 'gradient-bg text-white'
-                    : 'border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'
-                }`}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditing ? 'gradient-bg text-white' : 'border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'}`}
               >
-                {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : isEditing ? (
-                  <><Save className="w-4 h-4" /> Salvar</>
-                ) : (
-                  <><Pencil className="w-4 h-4" /> Editar</>
-                )}
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditing ? <><Save className="w-4 h-4" /> Salvar</> : <><Pencil className="w-4 h-4" /> Editar</>}
               </button>
             </div>
 
             <div className="space-y-5">
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Nome</label>
-                {isEditing ? (
-                  <input type="text" name="display_name" value={formData.display_name} onChange={handleChange} className="input-field text-sm" />
-                ) : (
-                  <p className="text-gray-100">{profile?.display_name || '—'}</p>
-                )}
+                {isEditing ? <input type="text" name="display_name" value={formData.display_name} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100">{profile?.display_name || '—'}</p>}
               </div>
-
+              
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Bio</label>
-                {isEditing ? (
-                  <textarea name="bio" value={formData.bio} onChange={handleChange} className="input-field text-sm resize-none h-20" maxLength={500} />
-                ) : (
-                  <p className="text-gray-400 text-sm">{profile?.bio || 'Nenhuma bio definida.'}</p>
-                )}
+                {isEditing ? <textarea name="bio" value={formData.bio} onChange={handleChange} className="input-field text-sm resize-none h-20" maxLength={500} /> : <p className="text-gray-400 text-sm">{profile?.bio || '—'}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -362,71 +316,102 @@ export default function ProfilePage() {
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Gênero</label>
                   {isEditing ? (
                     <select name="gender" value={formData.gender} onChange={handleChange} className="input-field text-sm">
-                      <option value="">Selecione</option>
-                      <option value="M">Masculino</option>
-                      <option value="F">Feminino</option>
+                      <option value="">Selecione</option><option value="M">Masculino</option><option value="F">Feminino</option>
                     </select>
-                  ) : (
-                    <p className="text-gray-100 text-sm">{genderLabels[profile?.gender] || '—'}</p>
-                  )}
+                  ) : <p className="text-gray-100 text-sm">{genderLabels[profile?.gender] || '—'}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Interessado em</label>
                   {isEditing ? (
                     <select name="looking_for" value={formData.looking_for} onChange={handleChange} className="input-field text-sm">
-                      <option value="">Selecione</option>
-                      <option value="M">Homens</option>
-                      <option value="F">Mulheres</option>
-                      <option value="A">Todos</option>
+                      <option value="">Selecione</option><option value="M">Homens</option><option value="F">Mulheres</option><option value="A">Todos</option>
                     </select>
-                  ) : (
-                    <p className="text-gray-100 text-sm">{lookingForLabels[profile?.looking_for] || '—'}</p>
-                  )}
+                  ) : <p className="text-gray-100 text-sm">{lookingForLabels[profile?.looking_for] || '—'}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Cidade</label>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Altura (cm)</label>
+                  {isEditing ? <input type="number" name="height_cm" value={formData.height_cm} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.height_cm ? `${profile.height_cm} cm` : '—'}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Filhos</label>
                   {isEditing ? (
-                    <input type="text" name="city" value={formData.city} onChange={handleChange} className="input-field text-sm" />
-                  ) : (
-                    <p className="text-gray-100 text-sm">{profile?.city || '—'}</p>
-                  )}
+                    <select name="children" value={formData.children} onChange={handleChange} className="input-field text-sm">
+                      <option value="">Selecione</option>{childrenOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : <p className="text-gray-100 text-sm">{getChoiceLabel(childrenOptions, profile?.children)}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Religião</label>
+                  {isEditing ? (
+                    <select name="religion" value={formData.religion} onChange={handleChange} className="input-field text-sm">
+                      <option value="">Selecione</option>{religionOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : <p className="text-gray-100 text-sm">{getChoiceLabel(religionOptions, profile?.religion)}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Política</label>
+                  {isEditing ? (
+                    <select name="politics" value={formData.politics} onChange={handleChange} className="input-field text-sm">
+                      <option value="">Selecione</option>{politicsOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : <p className="text-gray-100 text-sm">{getChoiceLabel(politicsOptions, profile?.politics)}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Escolaridade</label>
+                  {isEditing ? (
+                    <select name="education" value={formData.education} onChange={handleChange} className="input-field text-sm">
+                      <option value="">Selecione</option>{educationOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : <p className="text-gray-100 text-sm">{getChoiceLabel(educationOptions, profile?.education)}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Universidade</label>
+                  {isEditing ? <input type="text" name="university" value={formData.university} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.university || '—'}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Profissão</label>
+                  {isEditing ? <input type="text" name="job_title" value={formData.job_title} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.job_title || '—'}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Empresa</label>
+                  {isEditing ? <input type="text" name="company" value={formData.company} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.company || '—'}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Cidade</label>
+                  {isEditing ? <input type="text" name="city" value={formData.city} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.city || '—'}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Estado</label>
-                  {isEditing ? (
-                    <input type="text" name="state" value={formData.state} onChange={handleChange} className="input-field text-sm" />
-                  ) : (
-                    <p className="text-gray-100 text-sm">{profile?.state || '—'}</p>
-                  )}
+                  {isEditing ? <input type="text" name="state" value={formData.state} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.state || '—'}</p>}
                 </div>
               </div>
 
               {isEditing && (
                 <div className="pt-2">
-                  <button 
-                    type="button" 
-                    onClick={handleGetLocation} 
-                    disabled={isLocating}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm transition-colors"
-                  >
-                    {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
-                    Usar minha localização atual (GPS)
+                  <button type="button" onClick={handleGetLocation} disabled={isLocating} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm transition-colors">
+                    {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />} Atualizar Localização
                   </button>
                 </div>
               )}
-              
+
               <div className="pt-4 border-t border-[rgba(139,92,246,0.15)] mt-4">
-                <h4 className="text-sm font-semibold mb-4 text-gray-300">Preferências de Descoberta</h4>
-                
-                {profileError && (
-                  <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                    {profileError}
-                  </div>
-                )}
-                
+                <h4 className="text-sm font-semibold mb-4 text-gray-300">Preferências de Busca</h4>
+                {profileError && <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{profileError}</div>}
                 <div className="space-y-5">
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
@@ -434,187 +419,69 @@ export default function ProfilePage() {
                       <span className="text-xs text-purple-400 font-medium">{isEditing ? formData.max_distance_km : profile?.max_distance_km} km</span>
                     </div>
                     {isEditing ? (
-                      <div className="relative pt-2 pb-6">
-                        <input 
-                          type="range" 
-                          name="max_distance_km" 
-                          min="2" max="150" 
-                          list="distance-markers-profile"
-                          value={formData.max_distance_km} 
-                          onChange={handleChange} 
-                          className="w-full accent-purple-500 relative z-10" 
-                        />
-                        <datalist id="distance-markers-profile">
-                          {[25, 50, 75, 100, 125, 150].map(val => <option key={val} value={val}></option>)}
-                        </datalist>
-                        <div className="absolute top-7 left-0 right-0 pointer-events-none px-[2px]">
-                          {[25, 50, 75, 100, 125, 150].map(val => (
-                            <div key={`visual-${val}`}>
-                              <div 
-                                className="absolute w-[2px] h-1.5 bg-purple-500/50 -mt-[18px]" 
-                                style={{ left: `calc(${((val - 2) / 148) * 100}% - 1px)` }}
-                              />
-                              <div 
-                                className="absolute text-[10px] text-gray-400 font-medium transform -translate-x-1/2" 
-                                style={{ left: `${((val - 2) / 148) * 100}%` }}
-                              >
-                                {val}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
-                        <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(profile?.max_distance_km / 150) * 100}%` }}></div>
-                      </div>
-                    )}
+                      <input type="range" name="max_distance_km" min="2" max="150" value={formData.max_distance_km} onChange={handleChange} className="w-full accent-purple-500" />
+                    ) : <div className="w-full bg-gray-800 rounded-full h-2 mt-2"><div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(profile?.max_distance_km / 150) * 100}%` }}></div></div>}
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Mínima</label>
-                      {isEditing ? (
-                        <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference} onChange={handleChange} className="input-field text-sm" />
-                      ) : (
-                        <p className="text-gray-100 text-sm">{profile?.min_age_preference || '18'} anos</p>
-                      )}
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Mín.</label>
+                      {isEditing ? <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.min_age_preference || '18'} anos</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Máxima</label>
-                      {isEditing ? (
-                        <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference} onChange={handleChange} className="input-field text-sm" />
-                      ) : (
-                        <p className="text-gray-100 text-sm">{profile?.max_age_preference || '99'} anos</p>
-                      )}
+                      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Máx.</label>
+                      {isEditing ? <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.max_age_preference || '99'} anos</p>}
                     </div>
                   </div>
                 </div>
               </div>
+
             </div>
           </div>
 
-          {/* Segurança da Conta */}
           <div className="card p-6 mb-8">
             <div className="flex items-center gap-2 mb-5">
               <Shield className="w-5 h-5 text-purple-400" />
               <h3 className="font-semibold">Segurança da Conta</h3>
             </div>
-            
             <div className="space-y-4">
-              <button
-                onClick={() => setShowPasswordModal(true)}
-                className="w-full flex items-center justify-between p-4 rounded-xl bg-[#16162a] border border-[rgba(139,92,246,0.15)] hover:border-[rgba(139,92,246,0.4)] transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
-                    <Lock className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-medium text-gray-200">Alterar Senha</h4>
-                    <p className="text-xs text-gray-500">Atualize sua senha de acesso</p>
-                  </div>
-                </div>
+              <button onClick={() => setShowPasswordModal(true)} className="w-full flex items-center p-4 rounded-xl bg-[#16162a] border border-[rgba(139,92,246,0.15)] hover:border-purple-500/40 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mr-3"><Lock className="w-5 h-5 text-purple-400" /></div>
+                <div className="text-left"><h4 className="text-sm font-medium text-gray-200">Alterar Senha</h4><p className="text-xs text-gray-500">Atualize sua senha</p></div>
               </button>
-
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className="w-full flex items-center justify-between p-4 rounded-xl bg-red-500/5 border border-red-500/10 hover:border-red-500/30 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
-                    <Trash2 className="w-5 h-5 text-red-400" />
-                  </div>
-                  <div className="text-left">
-                    <h4 className="text-sm font-medium text-red-400">Excluir Conta</h4>
-                    <p className="text-xs text-red-400/60">Apagar perfil permanentemente</p>
-                  </div>
-                </div>
+              <button onClick={() => setShowDeleteModal(true)} className="w-full flex items-center p-4 rounded-xl bg-red-500/5 border border-red-500/10 hover:border-red-500/30 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center mr-3"><Trash2 className="w-5 h-5 text-red-400" /></div>
+                <div className="text-left"><h4 className="text-sm font-medium text-red-400">Excluir Conta</h4><p className="text-xs text-red-400/60">Apagar permanentemente</p></div>
               </button>
             </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="w-full py-3.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            Sair da conta
+          <button onClick={handleLogout} className="w-full py-3.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 mb-10">
+            <LogOut className="w-4 h-4" /> Sair
           </button>
         </div>
       </div>
 
-      {/* Modal: Change Password */}
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6 animate-fade-in">
-          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full animate-fade-in-up">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold">Alterar Senha</h3>
-              <button onClick={() => setShowPasswordModal(false)} className="text-gray-500 hover:text-gray-100">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setShowPasswordModal(false)}>
+          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-bold">Alterar Senha</h3><X className="w-5 h-5 cursor-pointer text-gray-400" onClick={() => setShowPasswordModal(false)}/></div>
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Senha Atual</label>
-                <input
-                  type="password"
-                  required
-                  className="input-field w-full text-sm"
-                  value={passwordData.current_password}
-                  onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">Nova Senha</label>
-                <input
-                  type="password"
-                  required
-                  className="input-field w-full text-sm"
-                  value={passwordData.new_password}
-                  onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
-                />
-              </div>
-              
-              <button
-                type="submit"
-                disabled={isChangingPassword}
-                className="w-full btn-primary mt-6 !py-3 flex items-center justify-center"
-              >
-                {isChangingPassword ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Alteração'}
-              </button>
+              <input type="password" placeholder="Senha Atual" required className="input-field w-full text-sm" value={passwordData.current_password} onChange={e => setPasswordData({...passwordData, current_password: e.target.value})} />
+              <input type="password" placeholder="Nova Senha" required className="input-field w-full text-sm" value={passwordData.new_password} onChange={e => setPasswordData({...passwordData, new_password: e.target.value})} />
+              <button type="submit" disabled={isChangingPassword} className="w-full btn-primary !py-3 flex justify-center">{isChangingPassword ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Confirmar'}</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal: Delete Account */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6 animate-fade-in">
-          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full animate-fade-in-up border border-red-500/20">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
-              </div>
-              <h3 className="text-lg font-bold text-red-400">Excluir Conta?</h3>
-            </div>
-            
-            <p className="text-gray-300 text-sm mb-6 leading-relaxed">
-              Esta ação é <strong className="text-white">permanente e irreversível</strong>. Todos os seus dados, matches e mensagens serão apagados para sempre.
-            </p>
-
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setShowDeleteModal(false)}>
+          <div className="glass-strong border border-red-500/20 rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-red-500" /></div><h3 className="text-lg font-bold text-red-400">Excluir Conta?</h3></div>
+            <p className="text-gray-300 text-sm mb-6">Esta ação é <strong>permanente e irreversível</strong>.</p>
             <div className="flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="btn-secondary flex-1 !py-3">
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={isDeleting}
-                className="flex-1 py-3 rounded-full bg-red-600 text-white font-semibold hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center justify-center"
-              >
-                {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Sim, Excluir'}
-              </button>
+              <button onClick={() => setShowDeleteModal(false)} className="btn-secondary flex-1 !py-3">Cancelar</button>
+              <button onClick={handleDeleteAccount} disabled={isDeleting} className="flex-1 py-3 rounded-full bg-red-600 text-white font-semibold hover:bg-red-500 transition-colors flex justify-center">{isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Excluir'}</button>
             </div>
           </div>
         </div>

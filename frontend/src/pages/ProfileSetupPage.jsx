@@ -1,15 +1,39 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Loader2, ArrowRight, Sparkles, LocateFixed } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { reverseGeocode } from '../services/geocoding';
+import { profileAPI } from '../services/api';
+import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import OnboardingProgressBar from '../components/onboarding/OnboardingProgressBar';
+import StepIdentity from '../components/onboarding/StepIdentity';
+import StepAbout from '../components/onboarding/StepAbout';
+import StepCareer from '../components/onboarding/StepCareer';
+import StepPhotos from '../components/onboarding/StepPhotos';
+import StepPrompts from '../components/onboarding/StepPrompts';
+import StepFilters from '../components/onboarding/StepFilters';
 
 export default function ProfileSetupPage() {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { updateProfile } = useAuth();
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     display_name: '',
-    bio: '',
+    date_of_birth: '',
     gender: '',
     looking_for: '',
+    bio: '',
+    height_cm: '',
+    religion: '',
+    politics: '',
+    children: '',
+    education: '',
+    university: '',
+    job_title: '',
+    company: '',
+    photos: Array(6).fill(null), // Array of { file, preview, caption, is_primary }
+    prompts: [], // Array of { question, answer }
     city: '',
     state: '',
     latitude: null,
@@ -17,76 +41,92 @@ export default function ProfileSetupPage() {
     max_distance_km: 50,
     min_age_preference: 18,
     max_age_preference: 99,
+    filter_min_height: '',
+    filter_max_height: '',
+    filter_education: [],
+    filter_religion: [],
+    filter_politics: [],
   });
-  const [isLocating, setIsLocating] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const { updateProfile } = useAuth();
-  const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const totalSteps = 6;
+
+  const validateStep = () => {
     setError('');
+    if (currentStep === 1) {
+      if (!formData.display_name || !formData.date_of_birth || !formData.gender || !formData.looking_for) {
+        setError('Preencha todos os campos obrigatórios.');
+        return false;
+      }
+    }
+    if (currentStep === 6) {
+      if (!formData.city || !formData.state) {
+        setError('Por favor, informe sua localização.');
+        return false;
+      }
+    }
+    return true;
   };
 
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      alert("Seu navegador não suporta geolocalização.");
-      return;
+  const nextStep = () => {
+    if (validateStep()) {
+      window.scrollTo(0, 0);
+      setCurrentStep(prev => Math.min(prev + 1, totalSteps));
     }
-    
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      
-      const geoResult = await reverseGeocode(lat, lng);
-      
-      setFormData(prev => ({
-        ...prev,
-        latitude: lat,
-        longitude: lng,
-        city: geoResult?.city || prev.city,
-        state: geoResult?.state || prev.state
-      }));
-      setIsLocating(false);
-      setError('');
-    }, (error) => {
-      console.error(error);
-      alert("Não foi possível obter sua localização. Verifique as permissões do navegador.");
-      setIsLocating(false);
-    });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const prevStep = () => {
+    setError('');
+    window.scrollTo(0, 0);
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
 
-    if (!formData.display_name || !formData.gender || !formData.looking_for || !formData.city || !formData.state) {
-      setError('Preencha todos os campos obrigatórios.');
-      return;
-    }
-
+  const handleSubmit = async () => {
+    if (!validateStep()) return;
     setIsLoading(true);
-    const result = await updateProfile(formData);
-    setIsLoading(false);
 
-    if (result.success) {
+    try {
+      // 1. Atualizar Profile
+      // Removendo campos que não vão pro profile model (date_of_birth, photos, prompts)
+      const { date_of_birth, photos, prompts, ...profileData } = formData;
+      
+      // Converte vazios de height para null pra não bugar BD numérico
+      if (profileData.height_cm === '') profileData.height_cm = null;
+      if (profileData.filter_min_height === '') profileData.filter_min_height = null;
+      if (profileData.filter_max_height === '') profileData.filter_max_height = null;
+
+      const profileResult = await updateProfile(profileData);
+      
+      if (!profileResult.success) throw new Error('Erro ao salvar perfil');
+
+      // 2. Atualizar Date of Birth (vai pro CustomUser)
+      await profileAPI.updateDateOfBirth(date_of_birth);
+
+      // 3. Upload Fotos
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        if (photo?.file) {
+          const fd = new FormData();
+          fd.append('image', photo.file);
+          fd.append('is_primary', photo.is_primary ? 'true' : 'false');
+          if (photo.caption) fd.append('caption', photo.caption);
+          await profileAPI.uploadPhoto(fd);
+        }
+      }
+
+      // 4. Salvar Prompts
+      for (const prompt of prompts) {
+        if (prompt.question && prompt.answer) {
+          await profileAPI.createPrompt({ question: prompt.question, answer: prompt.answer });
+        }
+      }
+
       navigate('/discover');
-    } else {
-      setError('Erro ao salvar perfil. Tente novamente.');
+    } catch (err) {
+      console.error(err);
+      setError('Erro ao salvar o perfil. Tente novamente.');
+      setIsLoading(false);
     }
   };
-
-  const genderOptions = [
-    { value: 'M', label: 'Masculino', emoji: '👨' },
-    { value: 'F', label: 'Feminino', emoji: '👩' },
-  ];
-
-  const lookingForOptions = [
-    { value: 'M', label: 'Homens', emoji: '👨' },
-    { value: 'F', label: 'Mulheres', emoji: '👩' },
-    { value: 'A', label: 'Todos', emoji: '💜' },
-  ];
 
   return (
     <div className="min-h-dvh bg-[#0a0a0f] flex flex-col relative overflow-hidden">
@@ -96,210 +136,77 @@ export default function ProfileSetupPage() {
         <div className="absolute bottom-[-10%] right-[20%] w-[300px] h-[300px] rounded-full bg-red-600/5 blur-[100px]" />
       </div>
 
-      <div className="relative z-10 flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-lg animate-fade-in-up">
-          {/* Header */}
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-5 text-sm text-gray-400">
+      <div className="relative z-10 flex-1 flex flex-col px-6 py-8">
+        <div className="w-full max-w-lg mx-auto flex-1 flex flex-col">
+          
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm text-gray-400">
               <Sparkles className="w-4 h-4 text-purple-400" />
               <span>Configure seu perfil</span>
             </div>
-            <h1 className="text-3xl font-bold font-heading mb-2">Conte sobre você</h1>
-            <p className="text-gray-400">Essas informações serão visíveis para outros usuários</p>
           </div>
 
-          {/* Error */}
+          <OnboardingProgressBar currentStep={currentStep} totalSteps={totalSteps} />
+
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in">
+            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in text-center">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Display Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
-                Nome de exibição <span className="text-red-400">*</span>
-              </label>
-              <input
-                id="setup-display-name"
-                type="text"
-                name="display_name"
-                value={formData.display_name}
-                onChange={handleChange}
-                placeholder="Como você quer ser chamado(a)?"
-                className="input-field"
-                maxLength={50}
-                required
-              />
-            </div>
+          <div className="flex-1">
+            {currentStep === 1 && <StepIdentity formData={formData} setFormData={setFormData} />}
+            {currentStep === 2 && <StepAbout formData={formData} setFormData={setFormData} />}
+            {currentStep === 3 && <StepCareer formData={formData} setFormData={setFormData} />}
+            {currentStep === 4 && <StepPhotos formData={formData} setFormData={setFormData} />}
+            {currentStep === 5 && <StepPrompts formData={formData} setFormData={setFormData} />}
+            {currentStep === 6 && <StepFilters formData={formData} setFormData={setFormData} />}
+          </div>
 
-            {/* Bio */}
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Bio</label>
-              <textarea
-                id="setup-bio"
-                name="bio"
-                value={formData.bio}
-                onChange={handleChange}
-                placeholder="Fale um pouco sobre você..."
-                className="input-field resize-none h-24"
-                maxLength={500}
-              />
-              <span className="text-xs text-gray-500 mt-1 block text-right">
-                {formData.bio.length}/500
-              </span>
-            </div>
-
-            {/* Gender */}
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-3">
-                Gênero <span className="text-red-400">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {genderOptions.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, gender: opt.value })}
-                    className={`p-3.5 rounded-xl border text-sm font-medium transition-all flex items-center gap-2.5 ${
-                      formData.gender === opt.value
-                        ? 'border-purple-500 bg-purple-500/10 text-purple-300'
-                        : 'border-[rgba(139,92,246,0.15)] bg-[#16162a] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'
-                    }`}
-                  >
-                    <span className="text-lg">{opt.emoji}</span>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Looking For */}
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-3">
-                Interessado em <span className="text-red-400">*</span>
-              </label>
-              <div className="grid grid-cols-3 gap-3">
-                {lookingForOptions.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, looking_for: opt.value })}
-                    className={`p-3.5 rounded-xl border text-sm font-medium transition-all flex flex-col items-center gap-1.5 ${
-                      formData.looking_for === opt.value
-                        ? 'border-red-500 bg-red-500/10 text-red-300'
-                        : 'border-[rgba(139,92,246,0.15)] bg-[#16162a] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'
-                    }`}
-                  >
-                    <span className="text-xl">{opt.emoji}</span>
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* City & State */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Cidade <span className="text-red-400">*</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                  <input
-                    id="setup-city"
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    placeholder="Sua cidade"
-                    className="input-field !pl-10 text-sm"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Estado <span className="text-red-400">*</span>
-                </label>
-                <input
-                  id="setup-state"
-                  type="text"
-                  name="state"
-                  value={formData.state}
-                  onChange={handleChange}
-                  placeholder="Ex: SP"
-                  className="input-field text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <button 
-                type="button" 
-                onClick={handleGetLocation} 
-                disabled={isLocating}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm transition-colors"
+          <div className="mt-10 flex gap-4">
+            {currentStep > 1 && (
+              <button
+                type="button"
+                onClick={prevStep}
+                disabled={isLoading}
+                className="w-14 h-14 shrink-0 rounded-xl bg-[#16162a] border border-[rgba(139,92,246,0.15)] flex items-center justify-center text-gray-400 hover:border-purple-400 hover:text-purple-400 transition-colors"
               >
-                {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
-                Preencher com minha localização (GPS)
+                <ArrowLeft className="w-6 h-6" />
               </button>
-            </div>
+            )}
+            
+            {currentStep < totalSteps ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                className="btn-primary flex-1 !py-3.5 text-base group"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  Continuar
+                  <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className="btn-primary flex-1 !py-3.5 text-base group"
+              >
+                <span className="flex items-center justify-center gap-2">
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      Começar a explorar
+                      <Sparkles className="w-5 h-5" />
+                    </>
+                  )}
+                </span>
+              </button>
+            )}
+          </div>
 
-            {/* Discovery Preferences */}
-            <div className="pt-4 border-t border-[rgba(139,92,246,0.15)] mt-4">
-              <h4 className="text-sm font-medium text-gray-400 mb-4">Suas Preferências de Busca</h4>
-              
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium text-gray-400">Distância Máxima</label>
-                    <span className="text-sm text-purple-400 font-medium">{formData.max_distance_km} km</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    name="max_distance_km" 
-                    min="2" max="150" 
-                    value={formData.max_distance_km} 
-                    onChange={handleChange} 
-                    className="w-full accent-purple-500" 
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Idade Mínima</label>
-                    <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference} onChange={handleChange} className="input-field text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Idade Máxima</label>
-                    <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference} onChange={handleChange} className="input-field text-sm" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Submit */}
-            <button
-              id="setup-submit"
-              type="submit"
-              disabled={isLoading}
-              className="btn-primary w-full !py-3.5 text-base disabled:opacity-50 group"
-            >
-              <span className="flex items-center justify-center gap-2">
-                {isLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    Começar a explorar
-                    <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-                  </>
-                )}
-              </span>
-            </button>
-          </form>
         </div>
       </div>
     </div>

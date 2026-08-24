@@ -4,8 +4,8 @@ from rest_framework.views import APIView
 from rest_framework.throttling import ScopedRateThrottle
 from django.contrib.auth import get_user_model
 import mimetypes
-from .models import Profile, ProfilePhoto
-from .serializers import UserSerializer, ProfileSerializer, ProfilePhotoSerializer
+from .models import Profile, ProfilePhoto, ProfilePrompt
+from .serializers import UserSerializer, ProfileSerializer, ProfilePhotoSerializer, ProfilePromptSerializer
 
 User = get_user_model()
 
@@ -26,7 +26,17 @@ class MeView(APIView):
             'username': user.username,
             'is_premium': user.is_premium,
             'has_profile': has_profile,
+            'date_of_birth': user.date_of_birth,
         })
+        
+    def patch(self, request):
+        """Permite atualizar dados do usuário base, como data de nascimento"""
+        user = request.user
+        if 'date_of_birth' in request.data:
+            user.date_of_birth = request.data['date_of_birth']
+            user.save()
+            return Response({'status': 'updated'})
+        return Response({'status': 'no fields updated'}, status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -81,12 +91,35 @@ class ProfilePhotoUploadView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class ProfilePhotoDeleteView(generics.DestroyAPIView):
+class ProfilePhotoUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = ProfilePhotoSerializer
     
     def get_queryset(self):
         return ProfilePhoto.objects.filter(profile=self.request.user.profile)
+
+
+class ProfilePromptListCreateView(generics.ListCreateAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = ProfilePromptSerializer
+    
+    def get_queryset(self):
+        return ProfilePrompt.objects.filter(profile=self.request.user.profile)
+        
+    def perform_create(self, serializer):
+        profile = self.request.user.profile
+        if profile.prompts.count() >= 3:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Limite de 3 prompts atingido.")
+        serializer.save(profile=profile)
+
+
+class ProfilePromptDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = ProfilePromptSerializer
+    
+    def get_queryset(self):
+        return ProfilePrompt.objects.filter(profile=self.request.user.profile)
 
 
 class ChangePasswordView(APIView):

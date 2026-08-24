@@ -49,6 +49,23 @@ class Profile(models.Model):
     # Status do match (Chave do conceito)
     has_active_match = models.BooleanField(default=False, db_index=True)
     
+    # === Atributos Pessoais (Vitals) ===
+    height_cm = models.PositiveSmallIntegerField(null=True, blank=True)
+    education = models.CharField(max_length=30, blank=True, default='')
+    university = models.CharField(max_length=100, blank=True, default='')
+    job_title = models.CharField(max_length=100, blank=True, default='')
+    company = models.CharField(max_length=100, blank=True, default='')
+    religion = models.CharField(max_length=30, blank=True, default='')
+    politics = models.CharField(max_length=30, blank=True, default='')
+    children = models.CharField(max_length=30, blank=True, default='')
+    
+    # === Filtros de Busca Avançados ===
+    filter_min_height = models.PositiveSmallIntegerField(null=True, blank=True)
+    filter_max_height = models.PositiveSmallIntegerField(null=True, blank=True)
+    filter_education = models.JSONField(default=list, blank=True)
+    filter_religion = models.JSONField(default=list, blank=True)
+    filter_politics = models.JSONField(default=list, blank=True)
+    
     def __str__(self):
         return f"{self.display_name} ({self.user.email})"
 
@@ -56,6 +73,7 @@ class ProfilePhoto(models.Model):
     """Fotos do perfil (até 6)"""
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='photos')
     image = models.ImageField(upload_to='profiles/%Y/%m/')
+    caption = models.CharField(max_length=150, blank=True, default='')
     is_primary = models.BooleanField(default=False)
     order = models.PositiveSmallIntegerField(default=0)
     
@@ -64,3 +82,17 @@ class ProfilePhoto(models.Model):
         
     def __str__(self):
         return f"Foto de {self.profile.display_name}"
+
+class ProfilePrompt(models.Model):
+    """Cards de Perguntas/Respostas do perfil (estilo Hinge)"""
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='prompts')
+    question = models.CharField(max_length=200)
+    answer = models.TextField(max_length=500)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"Prompt de {self.profile.display_name}: {self.question[:40]}"
+

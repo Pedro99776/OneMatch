@@ -280,14 +280,46 @@ export default function DiscoveryPage() {
               </div>
             )}
             
-            {/* Bio and Info Sections */}
-            <div className="px-6 py-6 bg-[#0a0a0f]">
+            {/* Bio, Vitals and Info Sections */}
+            <div className="px-6 py-6 bg-[#0a0a0f] space-y-6">
               {currentProfile.bio && (
-                <div className="mb-8">
+                <div>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sobre mim</h3>
                   <p className="text-gray-200 text-sm leading-relaxed bg-[#1a1a2e] p-5 rounded-2xl border border-[rgba(139,92,246,0.1)]">
                     {currentProfile.bio}
                   </p>
+                </div>
+              )}
+              
+              {/* Vitals & Career */}
+              <div className="flex flex-wrap gap-2">
+                {currentProfile.height_cm && (
+                  <div className="px-3 py-1.5 bg-[#1a1a2e] rounded-full text-xs font-medium text-gray-300 border border-[rgba(139,92,246,0.1)]">
+                    📏 {currentProfile.height_cm} cm
+                  </div>
+                )}
+                {currentProfile.job_title && (
+                  <div className="px-3 py-1.5 bg-[#1a1a2e] rounded-full text-xs font-medium text-gray-300 border border-[rgba(139,92,246,0.1)]">
+                    💼 {currentProfile.job_title} {currentProfile.company && `na ${currentProfile.company}`}
+                  </div>
+                )}
+                {currentProfile.university && (
+                  <div className="px-3 py-1.5 bg-[#1a1a2e] rounded-full text-xs font-medium text-gray-300 border border-[rgba(139,92,246,0.1)]">
+                    🎓 {currentProfile.university}
+                  </div>
+                )}
+              </div>
+              
+              {/* Prompts */}
+              {currentProfile.prompts && currentProfile.prompts.length > 0 && (
+                <div className="space-y-4">
+                  {currentProfile.prompts.map(prompt => (
+                    <div key={prompt.id} className="bg-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-2 h-full bg-purple-500"></div>
+                      <h3 className="text-sm font-bold text-gray-800 mb-2">{prompt.question}</h3>
+                      <p className="text-xl text-gray-900 font-heading leading-tight">{prompt.answer}</p>
+                    </div>
+                  ))}
                 </div>
               )}
               

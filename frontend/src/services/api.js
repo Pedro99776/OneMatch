@@ -75,11 +75,19 @@ export const profileAPI = {
   getMe: () => api.get('/api/auth/profile/me/'),
   updateMe: (data) => api.put('/api/auth/profile/me/', data),
   patchMe: (data) => api.patch('/api/auth/profile/me/', data),
+  updateDateOfBirth: (date_of_birth) => api.patch('/api/auth/me/', { date_of_birth }),
   uploadPhoto: (formData) =>
     api.post('/api/auth/profile/photos/', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  updatePhoto: (photoId, data) => api.patch(`/api/auth/profile/photos/${photoId}/`, data),
   deletePhoto: (photoId) => api.delete(`/api/auth/profile/photos/${photoId}/`),
+  
+  getPrompts: () => api.get('/api/auth/profile/prompts/'),
+  createPrompt: (data) => api.post('/api/auth/profile/prompts/', data),
+  updatePrompt: (id, data) => api.patch(`/api/auth/profile/prompts/${id}/`, data),
+  deletePrompt: (id) => api.delete(`/api/auth/profile/prompts/${id}/`),
+  
   changePassword: (data) => api.post('/api/auth/profile/change-password/', data),
   deleteAccount: () => api.delete('/api/auth/profile/delete-account/'),
 };

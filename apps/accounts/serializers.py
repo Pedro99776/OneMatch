@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
-from .models import Profile, ProfilePhoto
+from .models import Profile, ProfilePhoto, ProfilePrompt
 
 User = get_user_model()
 
@@ -50,10 +50,16 @@ class UserSerializer(serializers.ModelSerializer):
 class ProfilePhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProfilePhoto
-        fields = ('id', 'image', 'is_primary', 'order')
+        fields = ('id', 'image', 'is_primary', 'order', 'caption')
+
+class ProfilePromptSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfilePrompt
+        fields = ('id', 'question', 'answer', 'order')
 
 class ProfileSerializer(serializers.ModelSerializer):
     photos = ProfilePhotoSerializer(many=True, read_only=True)
+    prompts = ProfilePromptSerializer(many=True, read_only=True)
     # user_id é exposto para que o frontend saiba qual ID enviar no like
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     
@@ -61,7 +67,11 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = (
             'id', 'user_id', 'display_name', 'bio', 'gender', 'looking_for', 
-            'city', 'state', 'latitude', 'longitude', 'has_active_match', 'photos',
-            'max_distance_km', 'min_age_preference', 'max_age_preference'
+            'city', 'state', 'latitude', 'longitude', 'has_active_match', 'photos', 'prompts',
+            'max_distance_km', 'min_age_preference', 'max_age_preference',
+            'height_cm', 'education', 'university', 'job_title', 'company',
+            'religion', 'politics', 'children',
+            'filter_min_height', 'filter_max_height', 'filter_education',
+            'filter_religion', 'filter_politics'
         )
         read_only_fields = ('has_active_match', 'user_id')

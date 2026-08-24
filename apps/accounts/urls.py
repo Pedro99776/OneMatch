@@ -6,8 +6,8 @@ from rest_framework_simplejwt.views import (
 )
 from .serializers import CustomTokenObtainPairSerializer
 from .views import (
-    RegisterView, ProfileView, ProfilePhotoUploadView, ProfilePhotoDeleteView, MeView,
-    ChangePasswordView, DeleteAccountView
+    RegisterView, ProfileView, ProfilePhotoUploadView, ProfilePhotoUpdateDeleteView, MeView,
+    ChangePasswordView, DeleteAccountView, ProfilePromptListCreateView, ProfilePromptDetailView
 )
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -28,7 +28,11 @@ urlpatterns = [
     # Perfil
     path('profile/me/', ProfileView.as_view(), name='profile_me'),
     path('profile/photos/', ProfilePhotoUploadView.as_view(), name='profile_photos'),
-    path('profile/photos/<int:pk>/', ProfilePhotoDeleteView.as_view(), name='profile_photo_delete'),
+    path('profile/photos/<int:pk>/', ProfilePhotoUpdateDeleteView.as_view(), name='profile_photo_update_delete'),
+    
+    # Prompts
+    path('profile/prompts/', ProfilePromptListCreateView.as_view(), name='profile_prompts'),
+    path('profile/prompts/<int:pk>/', ProfilePromptDetailView.as_view(), name='profile_prompt_detail'),
     
     # Segurança
     path('profile/change-password/', ChangePasswordView.as_view(), name='change_password'),

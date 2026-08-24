@@ -107,6 +107,29 @@ class SwipeFeedView(generics.ListAPIView):
                 user__date_of_birth__gte=min_birth_date,
                 user__date_of_birth__lte=max_birth_date
             )
+            
+        # — Novos Filtros Opcionais
+        if my_profile:
+            if my_profile.filter_min_height:
+                queryset = queryset.filter(
+                    Q(height_cm__gte=my_profile.filter_min_height) | Q(height_cm__isnull=True)
+                )
+            if my_profile.filter_max_height:
+                queryset = queryset.filter(
+                    Q(height_cm__lte=my_profile.filter_max_height) | Q(height_cm__isnull=True)
+                )
+            if my_profile.filter_education:
+                queryset = queryset.filter(
+                    Q(education__in=my_profile.filter_education) | Q(education='')
+                )
+            if my_profile.filter_religion:
+                queryset = queryset.filter(
+                    Q(religion__in=my_profile.filter_religion) | Q(religion='')
+                )
+            if my_profile.filter_politics:
+                queryset = queryset.filter(
+                    Q(politics__in=my_profile.filter_politics) | Q(politics='')
+                )
 
         # ─── HA VERSINE FILTER (MVP) ───────────────────────────
         # NOTA: Para milhares de usuários numa mesma região, esta fórmula pode ficar lenta
@@ -128,4 +151,4 @@ class SwipeFeedView(generics.ListAPIView):
             ).filter(distance__lte=user_max_dist)
         # ────────────────────────────────────────────────────────────────
 
-        return queryset.prefetch_related('photos').order_by('?')[:20]
+        return queryset.prefetch_related('photos', 'prompts').order_by('?')[:20]
