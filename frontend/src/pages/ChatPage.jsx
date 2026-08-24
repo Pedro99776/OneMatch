@@ -1,6 +1,6 @@
-﻿import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, ArrowLeft, Loader2, User, AlertTriangle, X, CheckCheck } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, User, AlertTriangle, X, CheckCheck, Check } from 'lucide-react';
 import { matchingAPI, chatAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -45,6 +45,7 @@ export default function ChatPage() {
   const [isOtherTyping, setIsOtherTyping] = useState(false);
   const typingTimerRef = useRef(null);
   const sendTypingTimerRef = useRef(null);
+  const markReadTimerRef = useRef(null);
 
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -60,8 +61,13 @@ export default function ChatPage() {
   }, [messages, isOtherTyping, scrollToBottom]);
 
   const emitMarkRead = useCallback(() => {
+    if (markReadTimerRef.current) return;
+    
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'read_receipt' }));
+      markReadTimerRef.current = setTimeout(() => {
+        markReadTimerRef.current = null;
+      }, 2000);
     }
   }, []);
 
@@ -165,10 +171,14 @@ export default function ChatPage() {
 
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      clearTimeout(sendTypingTimerRef.current);
-      wsRef.current.send(JSON.stringify({ type: 'typing' }));
-      sendTypingTimerRef.current = setTimeout(() => {}, 2000);
+    
+    if (!sendTypingTimerRef.current) {
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'typing', is_typing: true }));
+      }
+      sendTypingTimerRef.current = setTimeout(() => {
+        sendTypingTimerRef.current = null;
+      }, 2000);
     }
   };
 
@@ -341,11 +351,11 @@ export default function ChatPage() {
                         {formatTime(msg.created_at)}
                       </span>
                       {isMine && (
-                        <CheckCheck
-                          className={`w-3.5 h-3.5 transition-colors ${
-                            wasRead ? 'text-purple-400' : 'text-gray-600'
-                          }`}
-                        />
+                        wasRead ? (
+                          <CheckCheck className="w-3.5 h-3.5 text-purple-400" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5 text-gray-600" />
+                        )
                       )}
                     </div>
                   )}

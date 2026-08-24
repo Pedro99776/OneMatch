@@ -104,6 +104,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
 
     async def typing_status(self, event):
+        if event['sender_id'] == self.user.id:
+            return
         await self.send(text_data=json.dumps({
             'type': 'typing',
             'sender_id': event['sender_id'],
@@ -111,6 +113,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
 
     async def read_receipt_status(self, event):
+        if event['reader_id'] == self.user.id:
+            return
         await self.send(text_data=json.dumps({
             'type': 'read_receipt',
             'reader_id': event['reader_id']
