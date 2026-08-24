@@ -212,18 +212,19 @@ SIMPLE_JWT = {
 }
 
 # Configuração do Django Channels (Redis)
-redis_url = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
-# Adiciona health_check_interval para evitar queda de conexão inativa
-if '?' not in redis_url:
-    redis_url += '?health_check_interval=30'
-else:
-    redis_url += '&health_check_interval=30'
+# Pega a URL do Redis, mas remove parâmetros extras (?...) que podem causar TimeoutError no BZPOPMIN
+raw_redis_url = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
+clean_redis_url = raw_redis_url.split('?')[0]
 
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [redis_url],
+            "hosts": [{
+                "address": clean_redis_url,
+                "socket_timeout": None,
+                "health_check_interval": 0,
+            }],
         },
     },
 }
