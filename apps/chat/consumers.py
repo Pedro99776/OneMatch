@@ -44,44 +44,77 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         logger.debug(f"[WS RECEIVE] Recebendo mensagem: {text_data}")
         text_data_json = json.loads(text_data)
-        message = text_data_json.get('message')
+        msg_type = text_data_json.get('type', 'chat_message')
         
-        if not message:
-            return
-
-        # Salva no banco de dados e retorna os dados seguros
-        logger.debug("[WS RECEIVE] Salvando no banco de dados...")
-        msg_data = await self.save_message(self.user, self.match_id, message)
-        
-        if msg_data:
-            logger.debug(f"[WS RECEIVE] Mensagem salva com sucesso: {msg_data}. Enviando para o grupo {self.room_group_name}...")
-            # Envia a mensagem para a sala (group)
+        if msg_type == 'typing':
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
-                    'type': 'chat_message',
-                    'message': message,
-                    'sender_id': msg_data['sender_id'],
-                    'sender_name': msg_data['sender_name']
+                    'type': 'typing_status',
+                    'sender_id': self.user.id,
+                    'is_typing': text_data_json.get('is_typing', False)
                 }
             )
-            logger.debug("[WS RECEIVE] group_send finalizado!")
+        elif msg_type == 'read_receipt':
+            # Persiste no banco: marca mensagens não lidas do outro usuário como lidas
+            await self.mark_messages_read(self.user, self.match_id)
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'read_receipt_status',
+                    'reader_id': self.user.id
+                }
+            )
         else:
-            logger.warning("[WS RECEIVE] Falha ao salvar a mensagem (provavelmente match não está ativo).")
+            message = text_data_json.get('message')
+            if not message:
+                return
+
+            # Salva no banco de dados e retorna os dados seguros
+            logger.debug("[WS RECEIVE] Salvando no banco de dados...")
+            msg_data = await self.save_message(self.user, self.match_id, message)
+            
+            if msg_data:
+                logger.debug(f"[WS RECEIVE] Mensagem salva com sucesso: {msg_data}. Enviando para o grupo {self.room_group_name}...")
+                # Envia a mensagem para a sala (group)
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message': message,
+                        'sender_id': msg_data['sender_id'],
+                        'sender_name': msg_data['sender_name'],
+                        'msg_id': msg_data['msg_id'],
+                        'created_at': msg_data['created_at'],
+                    }
+                )
+                logger.debug("[WS RECEIVE] group_send finalizado!")
+            else:
+                logger.warning("[WS RECEIVE] Falha ao salvar a mensagem (provavelmente match não está ativo).")
 
     # Recebe a mensagem do group (Redis) e manda pro WebSocket
     async def chat_message(self, event):
-        logger.debug(f"[WS CHAT_MESSAGE] Recebido do Redis, enviando para o cliente: {event}")
-        message = event['message']
-        sender_id = event['sender_id']
-        sender_name = event['sender_name']
-
         await self.send(text_data=json.dumps({
-            'message': message,
-            'sender_id': sender_id,
-            'sender_name': sender_name
+            'type': 'chat_message',
+            'message': event['message'],
+            'sender_id': event['sender_id'],
+            'sender_name': event['sender_name'],
+            'msg_id': event['msg_id'],
+            'created_at': event.get('created_at', ''),
         }))
-        logger.debug("[WS CHAT_MESSAGE] Enviado com sucesso para o cliente!")
+
+    async def typing_status(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'typing',
+            'sender_id': event['sender_id'],
+            'is_typing': event['is_typing']
+        }))
+
+    async def read_receipt_status(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'read_receipt',
+            'reader_id': event['reader_id']
+        }))
 
     @database_sync_to_async
     def is_match_member(self, user, match_id):
@@ -111,10 +144,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return {
                 'msg_id': msg.id,
                 'sender_id': user.id,
-                'sender_name': sender_name
+                'sender_name': sender_name,
+                'created_at': msg.created_at.isoformat(),
             }
         except Conversation.DoesNotExist:
             return None
+
+    @database_sync_to_async
+    def mark_messages_read(self, user, match_id):
+        """Marca como lidas todas as mensagens da conversa enviadas pelo outro usuário."""
+        try:
+            conversation = Conversation.objects.get(match_id=match_id)
+            Message.objects.filter(
+                conversation=conversation,
+                is_read=False
+            ).exclude(sender=user).update(is_read=True)
+        except Conversation.DoesNotExist:
+            pass
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):

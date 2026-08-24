@@ -1,8 +1,36 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, ArrowLeft, Heart, Loader2, User, AlertTriangle, X } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, User, AlertTriangle, X, CheckCheck } from 'lucide-react';
 import { matchingAPI, chatAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+
+// Formata data ISO para HH:mm
+function formatTime(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d)) return '';
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Retorna true se duas datas sao no mesmo dia
+function isSameDay(a, b) {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear()
+    && da.getMonth() === db.getMonth()
+    && da.getDate() === db.getDate();
+}
+
+// Label do separador de data
+function formatDateSeparator(isoString) {
+  const d = new Date(isoString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (isSameDay(isoString, today.toISOString())) return 'Hoje';
+  if (isSameDay(isoString, yesterday.toISOString())) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
 
 export default function ChatPage() {
   const [match, setMatch] = useState(null);
@@ -11,18 +39,31 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showUnmatchModal, setShowUnmatchModal] = useState(false);
   const [isUnmatching, setIsUnmatching] = useState(false);
+  // Mapa de msg_id -> is_read para atualizacao em tempo real
+  const [readMap, setReadMap] = useState({});
+  // Controla se o outro usuario esta digitando
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const typingTimerRef = useRef(null);
+  const sendTypingTimerRef = useRef(null);
+
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const { profile, loadProfile } = useAuth();
   const navigate = useNavigate();
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages, isOtherTyping, scrollToBottom]);
+
+  const emitMarkRead = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'read_receipt' }));
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,28 +75,28 @@ export default function ChatPage() {
         if (data && data.id) {
           if (!isMounted) return;
           setMatch(data);
-          
-          // Carrega histórico de mensagens primeiro
+
           try {
             const msgsRes = await chatAPI.getMessages(data.id);
             if (msgsRes.data && isMounted) {
               setMessages(msgsRes.data);
+              const initialReadMap = {};
+              msgsRes.data.forEach(m => { initialReadMap[m.id] = m.is_read; });
+              setReadMap(initialReadMap);
             }
           } catch (e) {
             console.error('Error loading messages:', e);
           }
-          
-          // Então conecta no WebSocket apenas se o componente ainda estiver montado
+
           if (isMounted) {
             localWs = connectWebSocket(data.id);
+            setTimeout(() => emitMarkRead(), 800);
           }
         } else {
           navigate('/discover');
         }
       } catch (err) {
-        if (err.response?.status === 204 && isMounted) {
-          navigate('/discover');
-        }
+        if (err.response?.status === 204 && isMounted) navigate('/discover');
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -64,53 +105,76 @@ export default function ChatPage() {
 
     return () => {
       isMounted = false;
-      if (localWs) {
-        localWs.close();
-      } else if (wsRef.current) {
-        wsRef.current.close();
-      }
+      if (localWs) localWs.close();
+      else if (wsRef.current) wsRef.current.close();
+      clearTimeout(typingTimerRef.current);
+      clearTimeout(sendTypingTimerRef.current);
     };
-  }, [navigate]);
+  }, [navigate, emitMarkRead]);
 
   const connectWebSocket = (matchId) => {
     const token = localStorage.getItem('access_token');
-    
-    // Obtém a URL base (mesma lógica do axios no api.js)
     let wsHost;
     if (import.meta.env.VITE_API_URL) {
-      // Ex: http://localhost:8000 -> ws://localhost:8000
       wsHost = import.meta.env.VITE_API_URL.replace('http', 'ws');
     } else {
-      // Se não tiver variável, por padrão o backend roda na porta 8000 localmente
       wsHost = 'ws://127.0.0.1:8000';
     }
-    
     const wsUrl = `${wsHost}/ws/chat/${matchId}/?token=${token}`;
-
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          content: data.message,
-          sender_id: data.sender_id,
-          sender_name: data.sender_name,
-          created_at: new Date().toISOString(),
-        },
-      ]);
+
+      if (data.type === 'chat_message') {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: data.msg_id || Date.now(),
+            content: data.message,
+            sender_id: data.sender_id,
+            sender_name: data.sender_name,
+            created_at: data.created_at || new Date().toISOString(),
+            is_read: false,
+          },
+        ]);
+        if (data.msg_id) {
+          setReadMap(prev => ({ ...prev, [data.msg_id]: false }));
+        }
+        emitMarkRead();
+      }
+
+      if (data.type === 'typing') {
+        setIsOtherTyping(true);
+        clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = setTimeout(() => setIsOtherTyping(false), 3000);
+      }
+
+      if (data.type === 'read_receipt') {
+        setReadMap(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(k => { updated[k] = true; });
+          return updated;
+        });
+      }
     };
 
     wsRef.current = ws;
     return ws;
   };
 
+  const handleInputChange = (e) => {
+    setNewMessage(e.target.value);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      clearTimeout(sendTypingTimerRef.current);
+      wsRef.current.send(JSON.stringify({ type: 'typing' }));
+      sendTypingTimerRef.current = setTimeout(() => {}, 2000);
+    }
+  };
+
   const sendMessage = (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !wsRef.current) return;
-
     if (wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ message: newMessage.trim() }));
       setNewMessage('');
@@ -137,6 +201,12 @@ export default function ChatPage() {
       : match.user_2
     : null;
 
+  const otherPhoto = otherUser?.photos?.find(p => p.is_primary)?.image
+    || otherUser?.photos?.[0]?.image
+    || null;
+
+  const myId = profile?.user_id;
+
   if (isLoading) {
     return (
       <div className="min-h-dvh bg-[#0a0a0f] flex items-center justify-center">
@@ -150,6 +220,7 @@ export default function ChatPage() {
 
   return (
     <div className="h-dvh bg-[#0a0a0f] flex flex-col">
+
       {/* Header */}
       <header className="flex items-center gap-4 px-5 py-4 glass-strong border-b border-[rgba(139,92,246,0.15)] flex-shrink-0">
         <button
@@ -160,16 +231,29 @@ export default function ChatPage() {
         </button>
 
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-full gradient-bg flex items-center justify-center flex-shrink-0">
-            <User className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden border-2 border-purple-500/30">
+            {otherPhoto ? (
+              <img src={otherPhoto} alt={otherUser?.display_name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full gradient-bg flex items-center justify-center">
+                <User className="w-5 h-5 text-white" />
+              </div>
+            )}
           </div>
+
           <div className="min-w-0">
             <h2 className="text-sm font-semibold truncate">
-              {otherUser?.username || 'Seu Match'}
+              {otherUser?.display_name || otherUser?.username || 'Seu Match'}
             </h2>
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-green-400" />
-              <span className="text-xs text-gray-500">Match ativo</span>
+              {isOtherTyping ? (
+                <span className="text-xs text-purple-400 italic animate-pulse">digitando...</span>
+              ) : (
+                <>
+                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                  <span className="text-xs text-gray-500">Match ativo</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -179,57 +263,121 @@ export default function ChatPage() {
           className="p-2 rounded-xl text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
           title="Desfazer match"
         >
-          <Heart className="w-5 h-5" />
+          <X className="w-5 h-5" />
         </button>
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-4">
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+            emitMarkRead();
+          }
+        }}
+      >
         {messages.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center py-16 animate-fade-in">
+          <div className="flex flex-col items-center justify-center text-center py-16 h-full animate-fade-in">
             <div className="w-16 h-16 rounded-full gradient-bg flex items-center justify-center mb-4 animate-pulse-glow">
-              <Heart className="w-8 h-8 text-white fill-white" />
+              <svg viewBox="0 0 24 24" className="w-8 h-8 text-white fill-white" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/>
+              </svg>
             </div>
-            <h3 className="font-semibold text-lg mb-2">Vocês deram match! 🎉</h3>
+            <h3 className="font-semibold text-lg mb-2">Voces deram match!</h3>
             <p className="text-gray-400 text-sm max-w-xs">
-              Essa é a única pessoa que você pode conversar agora. Envie a primeira mensagem!
+              Esse e o seu unico match. Mande a primeira mensagem e comece uma conexao de verdade!
             </p>
           </div>
         )}
 
-        {messages.map((msg) => {
-          const isMine = msg.sender_name === profile?.display_name;
+        {messages.map((msg, index) => {
+          const isMine = msg.sender_id === myId;
+          const prevMsg = messages[index - 1];
+          const nextMsg = messages[index + 1];
+
+          const isFirstInGroup = !prevMsg || prevMsg.sender_id !== msg.sender_id;
+          const isLastInGroup = !nextMsg || nextMsg.sender_id !== msg.sender_id;
+
+          const showDateSep = !prevMsg || !isSameDay(prevMsg.created_at, msg.created_at);
+
+          const wasRead = isMine && (readMap[msg.id] ?? msg.is_read);
 
           return (
-            <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+            <div key={msg.id}>
+              {showDateSep && msg.created_at && (
+                <div className="flex items-center gap-3 my-4">
+                  <div className="flex-1 h-px bg-[rgba(139,92,246,0.15)]" />
+                  <span className="text-xs text-gray-500 font-medium px-2">
+                    {formatDateSeparator(msg.created_at)}
+                  </span>
+                  <div className="flex-1 h-px bg-[rgba(139,92,246,0.15)]" />
+                </div>
+              )}
+
               <div
-                className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                  isMine
-                    ? 'gradient-bg text-white rounded-br-md'
-                    : 'bg-[#1a1a2e] border border-[rgba(139,92,246,0.15)] text-gray-100 rounded-bl-md'
-                }`}
+                className={`flex ${isMine ? 'justify-end' : 'justify-start'} ${
+                  isLastInGroup ? 'mb-3' : 'mb-0.5'
+                } animate-fade-in`}
               >
-                {!isMine && (
-                  <span className="block text-xs text-purple-400 font-medium mb-1">{msg.sender_name}</span>
-                )}
-                {msg.content}
+                <div className={`max-w-[75%] flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                  <div
+                    className={`px-4 py-2.5 text-sm leading-relaxed ${
+                      isMine
+                        ? `gradient-bg text-white ${
+                            isFirstInGroup ? 'rounded-t-2xl' : 'rounded-t-md'
+                          } ${isLastInGroup ? 'rounded-bl-2xl rounded-br-md' : 'rounded-br-md'}`
+                        : `bg-[#1a1a2e] border border-[rgba(139,92,246,0.15)] text-gray-100 ${
+                            isFirstInGroup ? 'rounded-t-2xl' : 'rounded-t-md'
+                          } ${isLastInGroup ? 'rounded-br-2xl rounded-bl-md' : 'rounded-bl-md'}`
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+
+                  {isLastInGroup && (
+                    <div className={`flex items-center gap-1 mt-1 ${isMine ? 'flex-row-reverse' : ''}`}>
+                      <span className="text-[11px] text-gray-600">
+                        {formatTime(msg.created_at)}
+                      </span>
+                      {isMine && (
+                        <CheckCheck
+                          className={`w-3.5 h-3.5 transition-colors ${
+                            wasRead ? 'text-purple-400' : 'text-gray-600'
+                          }`}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );
         })}
+
+        {isOtherTyping && (
+          <div className="flex justify-start mb-3 animate-fade-in">
+            <div className="bg-[#1a1a2e] border border-[rgba(139,92,246,0.15)] px-4 py-3 rounded-2xl rounded-bl-md flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
       <form
         onSubmit={sendMessage}
-        className="flex items-center gap-3 px-5 py-4 border-t border-[rgba(139,92,246,0.15)] bg-[#12121a] flex-shrink-0"
+        className="flex items-center gap-3 px-4 py-4 border-t border-[rgba(139,92,246,0.15)] bg-[#12121a] flex-shrink-0"
       >
         <input
           id="chat-input"
           type="text"
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
+          onChange={handleInputChange}
           placeholder="Digite sua mensagem..."
           className="input-field flex-1 !rounded-full"
           autoComplete="off"
@@ -260,7 +408,7 @@ export default function ChatPage() {
 
             <p className="text-gray-400 text-sm mb-6 leading-relaxed">
               Ao desfazer o match, <strong className="text-gray-100">ambos os perfis ficam livres</strong> para dar novos likes.
-              A conversa será encerrada.
+              A conversa sera encerrada.
             </p>
 
             <div className="flex gap-3">

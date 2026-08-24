@@ -20,6 +20,7 @@ export default function DiscoveryPage() {
     min_age_preference: profile?.min_age_preference || 18,
     max_age_preference: profile?.max_age_preference || 99,
   });
+  const [filterError, setFilterError] = useState('');
   const [isSavingFilters, setIsSavingFilters] = useState(false);
   const navigate = useNavigate();
 
@@ -36,12 +37,19 @@ export default function DiscoveryPage() {
 
   const handleSaveFilters = async (e) => {
     e.preventDefault();
+    setFilterError('');
     
     let minAge = parseInt(filterData.min_age_preference) || 18;
     let maxAge = parseInt(filterData.max_age_preference) || 99;
     
-    if (minAge < 18) minAge = 18;
-    if (maxAge < minAge) maxAge = minAge;
+    if (minAge < 18 || maxAge < 18) {
+      setFilterError('A idade mínima permitida é 18 anos.');
+      return;
+    }
+    if (minAge > maxAge) {
+      setFilterError('A idade mínima não pode ser maior que a máxima.');
+      return;
+    }
     
     const validatedData = {
       ...filterData,
@@ -460,39 +468,62 @@ export default function DiscoveryPage() {
 
         {/* Filters Modal */}
         {showFilters && (
-          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-fade-in">
+          <div 
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-fade-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowFilters(false);
+            }}
+          >
             <div className="bg-[#0a0a0f] rounded-t-3xl w-full border-t border-[rgba(139,92,246,0.2)] shadow-[0_-10px_40px_rgba(139,92,246,0.1)]">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold font-heading">Filtros de Busca</h3>
-                  <button onClick={() => setShowFilters(false)} className="text-gray-500 hover:text-white transition-colors">
+                  <button onClick={() => setShowFilters(false)} type="button" className="text-gray-500 hover:text-white transition-colors">
                     <X className="w-6 h-6" />
                   </button>
                 </div>
 
                 <form onSubmit={handleSaveFilters} className="space-y-6">
+                  {filterError && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                      {filterError}
+                    </div>
+                  )}
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <label className="block text-sm font-medium text-gray-300">Distância Máxima</label>
                       <span className="text-sm text-purple-400 font-bold">{filterData.max_distance_km} km</span>
                     </div>
-                    <input 
-                      type="range" 
-                      name="max_distance_km" 
-                      min="2" max="150" 
-                      list="distance-markers"
-                      value={filterData.max_distance_km} 
-                      onChange={(e) => setFilterData({...filterData, max_distance_km: parseInt(e.target.value)})} 
-                      className="w-full accent-purple-500" 
-                    />
-                    <datalist id="distance-markers">
-                      <option value="25"></option>
-                      <option value="50"></option>
-                      <option value="75"></option>
-                      <option value="100"></option>
-                      <option value="125"></option>
-                      <option value="150"></option>
-                    </datalist>
+                    <div className="relative pt-2 pb-6">
+                      <input 
+                        type="range" 
+                        name="max_distance_km" 
+                        min="2" max="150" 
+                        list="distance-markers"
+                        value={filterData.max_distance_km} 
+                        onChange={(e) => setFilterData({...filterData, max_distance_km: parseInt(e.target.value)})} 
+                        className="w-full accent-purple-500 relative z-10" 
+                      />
+                      <datalist id="distance-markers">
+                        {[25, 50, 75, 100, 125, 150].map(val => <option key={val} value={val}></option>)}
+                      </datalist>
+                      <div className="absolute top-7 left-0 right-0 pointer-events-none px-[2px]">
+                        {[25, 50, 75, 100, 125, 150].map(val => (
+                          <div key={`visual-${val}`}>
+                            <div 
+                              className="absolute w-[2px] h-1.5 bg-purple-500/50 -mt-[18px]" 
+                              style={{ left: `calc(${((val - 2) / 148) * 100}% - 1px)` }}
+                            />
+                            <div 
+                              className="absolute text-[10px] text-gray-400 font-medium transform -translate-x-1/2" 
+                              style={{ left: `${((val - 2) / 148) * 100}%` }}
+                            >
+                              {val}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

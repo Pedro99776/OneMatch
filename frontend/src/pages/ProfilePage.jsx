@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [profileError, setProfileError] = useState('');
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
     bio: profile?.bio || '',
@@ -37,11 +38,18 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
+    setProfileError('');
     let minAge = parseInt(formData.min_age_preference) || 18;
     let maxAge = parseInt(formData.max_age_preference) || 99;
     
-    if (minAge < 18) minAge = 18;
-    if (maxAge < minAge) maxAge = minAge;
+    if (minAge < 18 || maxAge < 18) {
+      setProfileError('A idade mínima permitida é 18 anos.');
+      return;
+    }
+    if (minAge > maxAge) {
+      setProfileError('A idade mínima não pode ser maior que a máxima.');
+      return;
+    }
     
     const validatedData = {
       ...formData,
@@ -413,6 +421,12 @@ export default function ProfilePage() {
               <div className="pt-4 border-t border-[rgba(139,92,246,0.15)] mt-4">
                 <h4 className="text-sm font-semibold mb-4 text-gray-300">Preferências de Descoberta</h4>
                 
+                {profileError && (
+                  <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    {profileError}
+                  </div>
+                )}
+                
                 <div className="space-y-5">
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
@@ -420,7 +434,7 @@ export default function ProfilePage() {
                       <span className="text-xs text-purple-400 font-medium">{isEditing ? formData.max_distance_km : profile?.max_distance_km} km</span>
                     </div>
                     {isEditing ? (
-                      <>
+                      <div className="relative pt-2 pb-6">
                         <input 
                           type="range" 
                           name="max_distance_km" 
@@ -428,17 +442,28 @@ export default function ProfilePage() {
                           list="distance-markers-profile"
                           value={formData.max_distance_km} 
                           onChange={handleChange} 
-                          className="w-full accent-purple-500" 
+                          className="w-full accent-purple-500 relative z-10" 
                         />
                         <datalist id="distance-markers-profile">
-                          <option value="25"></option>
-                          <option value="50"></option>
-                          <option value="75"></option>
-                          <option value="100"></option>
-                          <option value="125"></option>
-                          <option value="150"></option>
+                          {[25, 50, 75, 100, 125, 150].map(val => <option key={val} value={val}></option>)}
                         </datalist>
-                      </>
+                        <div className="absolute top-7 left-0 right-0 pointer-events-none px-[2px]">
+                          {[25, 50, 75, 100, 125, 150].map(val => (
+                            <div key={`visual-${val}`}>
+                              <div 
+                                className="absolute w-[2px] h-1.5 bg-purple-500/50 -mt-[18px]" 
+                                style={{ left: `calc(${((val - 2) / 148) * 100}% - 1px)` }}
+                              />
+                              <div 
+                                className="absolute text-[10px] text-gray-400 font-medium transform -translate-x-1/2" 
+                                style={{ left: `${((val - 2) / 148) * 100}%` }}
+                              >
+                                {val}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ) : (
                       <div className="w-full bg-gray-800 rounded-full h-2 mt-2">
                         <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(profile?.max_distance_km / 150) * 100}%` }}></div>
