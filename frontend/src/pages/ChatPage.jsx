@@ -63,6 +63,9 @@ export default function ChatPage() {
   const emitMarkRead = useCallback(() => {
     if (markReadTimerRef.current) return;
     
+    // Só envia se a página estiver focada/visível
+    if (document.visibilityState !== 'visible') return;
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'read_receipt' }));
       markReadTimerRef.current = setTimeout(() => {
@@ -70,6 +73,17 @@ export default function ChatPage() {
       }, 2000);
     }
   }, []);
+
+  // Emite leitura quando a aba ganha foco
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        emitMarkRead();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [emitMarkRead]);
 
   useEffect(() => {
     let isMounted = true;
@@ -96,7 +110,6 @@ export default function ChatPage() {
 
           if (isMounted) {
             localWs = connectWebSocket(data.id);
-            setTimeout(() => emitMarkRead(), 800);
           }
         } else {
           navigate('/discover');
@@ -129,6 +142,10 @@ export default function ChatPage() {
     const wsUrl = `${wsHost}/ws/chat/${matchId}/?token=${token}`;
     const ws = new WebSocket(wsUrl);
 
+    ws.onopen = () => {
+      emitMarkRead();
+    };
+
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
@@ -151,9 +168,14 @@ export default function ChatPage() {
       }
 
       if (data.type === 'typing') {
-        setIsOtherTyping(true);
-        clearTimeout(typingTimerRef.current);
-        typingTimerRef.current = setTimeout(() => setIsOtherTyping(false), 3000);
+        if (data.is_typing) {
+          setIsOtherTyping(true);
+          clearTimeout(typingTimerRef.current);
+          typingTimerRef.current = setTimeout(() => setIsOtherTyping(false), 5000);
+        } else {
+          setIsOtherTyping(false);
+          clearTimeout(typingTimerRef.current);
+        }
       }
 
       if (data.type === 'read_receipt') {
@@ -170,15 +192,23 @@ export default function ChatPage() {
   };
 
   const handleInputChange = (e) => {
-    setNewMessage(e.target.value);
+    const val = e.target.value;
+    const isAdding = val.length > newMessage.length;
+    setNewMessage(val);
     
-    if (!sendTypingTimerRef.current) {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'typing', is_typing: true }));
-      }
-      sendTypingTimerRef.current = setTimeout(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      if (val.trim() === '') {
+        // Se apagou tudo, corta o digitando imediatamente
+        wsRef.current.send(JSON.stringify({ type: 'typing', is_typing: false }));
+        clearTimeout(sendTypingTimerRef.current);
         sendTypingTimerRef.current = null;
-      }, 2000);
+      } else if (isAdding && !sendTypingTimerRef.current) {
+        // Só emite se estiver ADICIONANDO texto (pra não bugar se ficar apagando)
+        wsRef.current.send(JSON.stringify({ type: 'typing', is_typing: true }));
+        sendTypingTimerRef.current = setTimeout(() => {
+          sendTypingTimerRef.current = null;
+        }, 2000);
+      }
     }
   };
 
@@ -187,7 +217,11 @@ export default function ChatPage() {
     if (!newMessage.trim() || !wsRef.current) return;
     if (wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ message: newMessage.trim() }));
+      // Corta o digitando assim que envia
+      wsRef.current.send(JSON.stringify({ type: 'typing', is_typing: false }));
       setNewMessage('');
+      clearTimeout(sendTypingTimerRef.current);
+      sendTypingTimerRef.current = null;
     }
   };
 
