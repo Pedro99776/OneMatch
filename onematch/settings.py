@@ -212,11 +212,18 @@ SIMPLE_JWT = {
 }
 
 # Configuração do Django Channels (Redis)
+redis_url = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
+# Adiciona health_check_interval para evitar queda de conexão inativa
+if '?' not in redis_url:
+    redis_url += '?health_check_interval=30'
+else:
+    redis_url += '&health_check_interval=30'
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')],
+            "hosts": [redis_url],
         },
     },
 }
