@@ -8,6 +8,7 @@ class CustomUser(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     is_verified = models.BooleanField(default=False)
     date_of_birth = models.DateField(null=True, blank=True)
+    last_birth_date_change = models.DateTimeField(null=True, blank=True)
     is_premium = models.BooleanField(default=False)
     
     # Define o email como campo de login principal

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil, Lock, Shield, AlertTriangle, X, LocateFixed, MessageSquareQuote } from 'lucide-react';
+import { User, Camera, Save, LogOut, Loader2, Trash2, Heart, MapPin, Pencil, Lock, Shield, AlertTriangle, X, LocateFixed, MessageSquareQuote, Eye, Plus, CalendarClock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
 import { reverseGeocode } from '../services/geocoding';
 import AppLayout from '../components/AppLayout';
 import { educationOptions, religionOptions, politicsOptions, childrenOptions } from '../data/choices';
+import { PROMPTS_LIST } from '../data/promptsList';
 import { useToast } from '../contexts/ToastContext';
 import RangeSlider from '../components/RangeSlider';
+import ProfilePreviewModal from '../components/profile/ProfilePreviewModal';
 
 export default function ProfilePage() {
   const { profile, updateProfile, logout, loadProfile } = useAuth();
@@ -21,6 +23,23 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profileError, setProfileError] = useState('');
+  
+  // Novos recursos
+  const { user } = useAuth();
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  
+  const [localPhotos, setLocalPhotos] = useState([]);
+  const [draggedPhotoId, setDraggedPhotoId] = useState(null);
+  const [captionModalPhoto, setCaptionModalPhoto] = useState(null);
+  const [captionText, setCaptionText] = useState('');
+  
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const [promptData, setPromptData] = useState({ id: null, question: '', answer: '' });
+  
+  const [showDobModal, setShowDobModal] = useState(false);
+  const [dobText, setDobText] = useState(user?.date_of_birth || '');
+  const [isChangingDob, setIsChangingDob] = useState(false);
+
   
   // Accordion states
   const [openSections, setOpenSections] = useState({
@@ -69,6 +88,7 @@ export default function ProfilePage() {
         ...profile,
         height_cm: profile.height_cm || '',
       }));
+      setLocalPhotos(profile.photos || []);
     }
   }, [profile]);
 
@@ -229,6 +249,111 @@ export default function ProfilePage() {
     }
   };
 
+  // Handlers para reordenar fotos (Drag & Drop)
+  const handleDragStart = (e, photoId) => {
+    setDraggedPhotoId(photoId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e, targetPhotoId) => {
+    e.preventDefault();
+    if (!draggedPhotoId || draggedPhotoId === targetPhotoId) return;
+
+    const draggedIdx = localPhotos.findIndex(p => p.id === draggedPhotoId);
+    const targetIdx = localPhotos.findIndex(p => p.id === targetPhotoId);
+    if (draggedIdx < 0 || targetIdx < 0) return;
+
+    const newPhotos = [...localPhotos];
+    const [draggedItem] = newPhotos.splice(draggedIdx, 1);
+    newPhotos.splice(targetIdx, 0, draggedItem);
+    
+    setLocalPhotos(newPhotos);
+    
+    try {
+      const orders = newPhotos.map(p => p.id);
+      await profileAPI.reorderPhotos(orders);
+      await loadProfile();
+    } catch(err) {
+      toast.error('Erro ao reordenar fotos.');
+      setLocalPhotos(profile.photos);
+    }
+    setDraggedPhotoId(null);
+  };
+
+  // Handlers para legenda
+  const handleSaveCaption = async (e) => {
+    e?.preventDefault();
+    if (!captionModalPhoto) return;
+    try {
+       await profileAPI.updatePhoto(captionModalPhoto.id, { caption: captionText });
+       await loadProfile();
+       setCaptionModalPhoto(null);
+    } catch(err) {
+       toast.error('Erro ao salvar legenda.');
+    }
+  };
+
+  // Handlers para Prompt
+  const handleSavePrompt = async (e) => {
+    e?.preventDefault();
+    if (!promptData.question || !promptData.answer) return;
+    try {
+      if (promptData.id) {
+         await profileAPI.updatePrompt(promptData.id, { question: promptData.question, answer: promptData.answer });
+      } else {
+         await profileAPI.createPrompt({ question: promptData.question, answer: promptData.answer });
+      }
+      await loadProfile();
+      setShowPromptModal(false);
+    } catch (err) {
+      toast.error('Erro ao salvar prompt. Lembre-se do limite de 3.');
+    }
+  };
+
+  // Handlers para Data de Nascimento
+  const calculateDobCooldown = () => {
+     if (!user?.last_birth_date_change) return null;
+     const lastChange = new Date(user.last_birth_date_change);
+     const limitDate = new Date(lastChange.getTime() + 90 * 24 * 60 * 60 * 1000);
+     if (new Date() < limitDate) {
+        return limitDate;
+     }
+     return null;
+  };
+  
+  const dobCooldown = calculateDobCooldown();
+
+  const handleSaveDob = async (e) => {
+     e?.preventDefault();
+     
+     const dob = new Date(dobText);
+     const today = new Date();
+     let age = today.getFullYear() - dob.getFullYear();
+     const m = today.getMonth() - dob.getMonth();
+     if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+         age--;
+     }
+     if (age < 18 || age > 99) {
+       toast.error('Você deve ter entre 18 e 99 anos.');
+       return;
+     }
+     
+     setIsChangingDob(true);
+     try {
+       await profileAPI.updateDateOfBirth(dobText);
+       window.location.reload();
+     } catch (err) {
+       toast.error(err.response?.data?.error || 'Erro ao alterar.');
+     } finally {
+       setIsChangingDob(false);
+     }
+  };
+
   const genderLabels = { M: 'Masculino', F: 'Feminino' };
   const lookingForLabels = { M: 'Homens', F: 'Mulheres', A: 'Todos' };
   
@@ -255,25 +380,40 @@ export default function ProfilePage() {
             </div>
             <h1 className="text-2xl font-bold font-heading">{profile?.display_name || 'Seu Perfil'}</h1>
             {profile?.city && (
-              <div className="flex items-center justify-center gap-1.5 text-gray-400 text-sm mt-1">
+              <div className="flex items-center justify-center gap-1.5 text-gray-400 text-sm mt-1 mb-4">
                 <MapPin className="w-4 h-4" /><span>{profile.city}, {profile.state}</span>
               </div>
             )}
+            <button onClick={() => setShowPreviewModal(true)} className="mx-auto mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors text-sm font-medium">
+              <Eye className="w-4 h-4" /> Visualizar como os outros veem
+            </button>
           </div>
 
           <div className="mb-8">
-            <h3 className="text-sm font-medium text-gray-400 mb-3">Suas fotos ({profile?.photos?.length || 0}/6)</h3>
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Suas fotos ({localPhotos?.length || 0}/6)</h3>
             <div className="grid grid-cols-3 gap-3">
               {[...Array(6)].map((_, index) => {
-                const photo = profile?.photos?.[index];
+                const photo = localPhotos?.[index];
                 if (photo) {
                   return (
-                    <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden group border border-[rgba(139,92,246,0.15)] flex flex-col">
+                    <div 
+                      key={photo.id} 
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, photo.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, photo.id)}
+                      className={`relative aspect-square rounded-xl overflow-hidden group border flex flex-col cursor-move ${draggedPhotoId === photo.id ? 'opacity-50 border-purple-500' : 'border-[rgba(139,92,246,0.15)]'}`}
+                    >
                       <div className="relative flex-1 w-full h-full">
-                        <img src={photo.image} alt="" className="w-full h-full object-cover" />
-                        <button onClick={() => handleDeletePhoto(photo.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-red-600">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <img src={photo.image} alt="" className="w-full h-full object-cover pointer-events-none" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button onClick={() => { setCaptionModalPhoto(photo); setCaptionText(photo.caption || ''); }} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-purple-500 transition-colors" title="Editar Legenda">
+                            <MessageSquareQuote className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeletePhoto(photo.id)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-red-600 transition-colors" title="Excluir">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                         {photo.is_primary && <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider">Perfil</div>}
                       </div>
                       {photo.caption && (
@@ -285,7 +425,11 @@ export default function ProfilePage() {
                   );
                 } else {
                   return (
-                    <label key={`empty-${index}`} className="relative aspect-square rounded-xl overflow-hidden border border-dashed border-[rgba(139,92,246,0.2)] bg-[#16162a]/50 hover:bg-[#16162a] flex items-center justify-center cursor-pointer transition-colors group">
+                    <label 
+                      key={`empty-${index}`} 
+                      onDragOver={handleDragOver}
+                      className="relative aspect-square rounded-xl overflow-hidden border border-dashed border-[rgba(139,92,246,0.2)] bg-[#16162a]/50 hover:bg-[#16162a] flex items-center justify-center cursor-pointer transition-colors group"
+                    >
                       {isUploadingPhoto ? <Loader2 className="w-5 h-5 text-gray-500 animate-spin" /> : <span className="text-purple-400 text-lg font-medium">+</span>}
                       <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={isUploadingPhoto} />
                     </label>
@@ -295,22 +439,32 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {profile?.prompts?.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-400 mb-3">Seus Prompts ({profile.prompts.length}/3)</h3>
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-sm font-medium text-gray-400">Seus Prompts ({(profile?.prompts?.length || 0)}/3)</h3>
+              {(!profile?.prompts || profile.prompts.length < 3) && (
+                <button onClick={() => { setPromptData({ id: null, question: '', answer: '' }); setShowPromptModal(true); }} className="text-xs font-medium text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                  <Plus className="w-3 h-3" /> Adicionar
+                </button>
+              )}
+            </div>
+            
+            {profile?.prompts?.length > 0 && (
               <div className="space-y-3">
                 {profile.prompts.map(prompt => (
-                  <div key={prompt.id} className="bg-[#16162a] border border-[rgba(139,92,246,0.2)] rounded-xl p-4 relative group">
-                    <button onClick={() => handleDeletePrompt(prompt.id)} className="absolute top-3 right-3 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  <div key={prompt.id} className="bg-[#16162a] border border-[rgba(139,92,246,0.2)] rounded-xl p-4 relative group cursor-pointer hover:border-purple-500/50 transition-colors" onClick={() => { setPromptData({ id: prompt.id, question: prompt.question, answer: prompt.answer }); setShowPromptModal(true); }}>
+                    <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={(e) => { e.stopPropagation(); handleDeletePrompt(prompt.id); }} className="text-gray-500 hover:text-red-400" title="Excluir">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                     <div className="text-xs font-semibold text-purple-300 mb-1 pr-6">{prompt.question}</div>
                     <div className="text-sm text-gray-200">{prompt.answer}</div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="card mb-6 overflow-hidden">
             <div 
@@ -530,6 +684,10 @@ export default function ProfilePage() {
           
           <div className={`transition-all duration-300 ease-in-out ${openSections.security ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
             <div className="p-6 pt-0 border-t border-[rgba(139,92,246,0.1)] mt-2 space-y-4">
+              <button onClick={() => setShowDobModal(true)} className="w-full flex items-center p-4 rounded-xl bg-[#16162a] border border-[rgba(139,92,246,0.15)] hover:border-purple-500/40 transition-colors">
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mr-3"><CalendarClock className="w-5 h-5 text-purple-400" /></div>
+                <div className="text-left"><h4 className="text-sm font-medium text-gray-200">Data de Nascimento</h4><p className="text-xs text-gray-500">Alterar sua idade</p></div>
+              </button>
               <button onClick={() => setShowPasswordModal(true)} className="w-full flex items-center p-4 rounded-xl bg-[#16162a] border border-[rgba(139,92,246,0.15)] hover:border-purple-500/40 transition-colors">
                 <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mr-3"><Lock className="w-5 h-5 text-purple-400" /></div>
                 <div className="text-left"><h4 className="text-sm font-medium text-gray-200">Alterar Senha</h4><p className="text-xs text-gray-500">Atualize sua senha</p></div>
@@ -570,6 +728,90 @@ export default function ProfilePage() {
               <button onClick={() => setShowDeleteModal(false)} className="btn-secondary flex-1 !py-3">Cancelar</button>
               <button onClick={handleDeleteAccount} disabled={isDeleting} className="flex-1 py-3 rounded-full bg-red-600 text-white font-semibold hover:bg-red-500 transition-colors flex justify-center">{isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Excluir'}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showPreviewModal && (
+        <ProfilePreviewModal profile={profile} onClose={() => setShowPreviewModal(false)} />
+      )}
+
+      {captionModalPhoto && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setCaptionModalPhoto(null)}>
+          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-bold">Editar Legenda</h3><X className="w-5 h-5 cursor-pointer text-gray-400" onClick={() => setCaptionModalPhoto(null)}/></div>
+            <form onSubmit={handleSaveCaption} className="space-y-4">
+              <textarea placeholder="Escreva uma legenda..." className="input-field w-full text-sm resize-none h-20" value={captionText} onChange={e => setCaptionText(e.target.value)} maxLength={150} />
+              <button type="submit" className="w-full btn-primary !py-3 flex justify-center">Salvar</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showPromptModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setShowPromptModal(false)}>
+          <div className="bg-[#0a0a0f] border border-[rgba(139,92,246,0.2)] rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-bold font-heading">{promptData.id ? 'Editar Prompt' : 'Adicionar Prompt'}</h3><X className="w-5 h-5 cursor-pointer text-gray-400" onClick={() => setShowPromptModal(false)}/></div>
+            <form onSubmit={handleSavePrompt} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Pergunta</label>
+                <select 
+                  className="input-field w-full text-sm" 
+                  value={promptData.question} 
+                  onChange={e => setPromptData({...promptData, question: e.target.value})} 
+                  required
+                >
+                  <option value="">Selecione uma pergunta</option>
+                  {PROMPTS_LIST.map((q, idx) => (
+                    <option key={idx} value={q}>{q}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Resposta</label>
+                <textarea 
+                  placeholder="Sua resposta..." 
+                  className="input-field w-full text-sm resize-none h-24" 
+                  value={promptData.answer} 
+                  onChange={e => setPromptData({...promptData, answer: e.target.value})} 
+                  maxLength={500} 
+                  required 
+                />
+              </div>
+              <button type="submit" className="w-full btn-primary !py-3 flex justify-center">Salvar</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showDobModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setShowDobModal(false)}>
+          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-bold">Data de Nascimento</h3><X className="w-5 h-5 cursor-pointer text-gray-400" onClick={() => setShowDobModal(false)}/></div>
+            {dobCooldown ? (
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-4">
+                  <CalendarClock className="w-6 h-6 text-orange-400" />
+                </div>
+                <p className="text-sm text-gray-300 mb-2">Você alterou sua data de nascimento recentemente.</p>
+                <p className="text-sm font-bold text-orange-400">Só poderá alterar novamente a partir de {dobCooldown.toLocaleDateString()}.</p>
+                <button onClick={() => setShowDobModal(false)} className="w-full btn-secondary mt-6 !py-3">Voltar</button>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveDob} className="space-y-4">
+                <p className="text-xs text-gray-400 mb-4">Atenção: Por questões de segurança, você só poderá alterar sua data de nascimento 1 vez a cada 3 meses.</p>
+                <input 
+                  type="date" 
+                  required 
+                  className="input-field w-full text-sm" 
+                  value={dobText} 
+                  onChange={e => setDobText(e.target.value)} 
+                  min={new Date(new Date().setFullYear(new Date().getFullYear() - 99)).toISOString().split('T')[0]}
+                  max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
+                />
+                <button type="submit" disabled={isChangingDob} className="w-full btn-primary !py-3 flex justify-center">{isChangingDob ? <Loader2 className="w-5 h-5 animate-spin"/> : 'Confirmar'}</button>
+              </form>
+            )}
           </div>
         </div>
       )}

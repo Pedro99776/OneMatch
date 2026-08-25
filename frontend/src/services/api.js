@@ -82,6 +82,7 @@ export const profileAPI = {
     }),
   updatePhoto: (photoId, data) => api.patch(`/api/auth/profile/photos/${photoId}/`, data),
   deletePhoto: (photoId) => api.delete(`/api/auth/profile/photos/${photoId}/`),
+  reorderPhotos: (orders) => api.post('/api/auth/profile/photos/reorder/', { orders }),
   
   getPrompts: () => api.get('/api/auth/profile/prompts/'),
   createPrompt: (data) => api.post('/api/auth/profile/prompts/', data),

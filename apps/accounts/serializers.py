@@ -33,6 +33,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'username': user.username,
             'is_premium': user.is_premium,
             'has_profile': has_profile,
+            'last_birth_date_change': user.last_birth_date_change,
         }
 
         return data
@@ -42,7 +43,7 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'password', 'phone', 'date_of_birth')
+        fields = ('id', 'email', 'username', 'password', 'phone', 'date_of_birth', 'last_birth_date_change')
         extra_kwargs = {'password': {'write_only': True}}
         
     def create(self, validated_data):

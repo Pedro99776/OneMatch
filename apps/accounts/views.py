@@ -27,15 +27,29 @@ class MeView(APIView):
             'is_premium': user.is_premium,
             'has_profile': has_profile,
             'date_of_birth': user.date_of_birth,
+            'last_birth_date_change': user.last_birth_date_change,
         })
         
     def patch(self, request):
         """Permite atualizar dados do usuário base, como data de nascimento"""
         user = request.user
         if 'date_of_birth' in request.data:
+            from django.utils import timezone
+            from datetime import timedelta
+            
+            # Trava de 3 meses
+            if user.last_birth_date_change:
+                limit_date = user.last_birth_date_change + timedelta(days=90)
+                if timezone.now() < limit_date:
+                    return Response(
+                        {"error": f"Você só poderá alterar sua data de nascimento novamente a partir de {limit_date.strftime('%d/%m/%Y')}."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
             user.date_of_birth = request.data['date_of_birth']
+            user.last_birth_date_change = timezone.now()
             user.save()
-            return Response({'status': 'updated'})
+            return Response({'status': 'updated', 'last_birth_date_change': user.last_birth_date_change})
         return Response({'status': 'no fields updated'}, status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(generics.CreateAPIView):
@@ -97,6 +111,31 @@ class ProfilePhotoUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     
     def get_queryset(self):
         return ProfilePhoto.objects.filter(profile=self.request.user.profile)
+
+
+class ProfilePhotoReorderView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    
+    def post(self, request, *args, **kwargs):
+        # Recebe array com os novos ids das fotos na ordem desejada
+        # Exemplo: {'orders': [5, 2, 8]} significa id 5 tem order 0, id 2 tem order 1, id 8 tem order 2
+        photo_ids = request.data.get('orders', [])
+        
+        if not isinstance(photo_ids, list):
+            return Response({"error": "Formato inválido. 'orders' deve ser uma lista de IDs."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        profile = request.user.profile
+        
+        # Validar segurança (verificar se as fotos pertencem ao usuário)
+        existing_photos = {p.id: p for p in profile.photos.all()}
+        
+        for idx, p_id in enumerate(photo_ids):
+            if p_id in existing_photos:
+                photo = existing_photos[p_id]
+                photo.order = idx
+                photo.save(update_fields=['order'])
+                
+        return Response({"status": "Reordenado com sucesso."})
 
 
 class ProfilePromptListCreateView(generics.ListCreateAPIView):

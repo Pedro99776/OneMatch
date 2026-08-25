@@ -57,6 +57,18 @@ export default function ProfileSetupPage() {
         setError('Preencha todos os campos obrigatórios.');
         return false;
       }
+      
+      const dob = new Date(formData.date_of_birth);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+          age--;
+      }
+      if (age < 18 || age > 99) {
+        setError('Você deve ter entre 18 e 99 anos para criar uma conta no OneMatch.');
+        return false;
+      }
     }
     if (currentStep === 6) {
       if (!formData.city || !formData.state) {

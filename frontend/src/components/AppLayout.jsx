@@ -36,7 +36,7 @@ export default function AppLayout({ children }) {
         {/* Top Bar Mobile Only */}
         <header className="md:hidden flex items-center justify-center px-6 py-4 border-b border-[rgba(139,92,246,0.15)] bg-[#0B0A10] flex-shrink-0 z-10">
           <div className="flex items-center gap-2">
-            <Heart className="w-6 h-6 text-purple-500 fill-purple-500" />
+            <img src="/logo.jpg" alt="OneMatch" className="w-8 h-8 rounded-lg" />
             <span className="text-lg font-bold font-heading gradient-text">OneMatch</span>
           </div>
         </header>

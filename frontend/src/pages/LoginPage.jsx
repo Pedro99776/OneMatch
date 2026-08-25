@@ -25,19 +25,20 @@ export default function LoginPage() {
   return (
     <div className="min-h-dvh flex bg-[#0a0a0f] relative overflow-hidden">
       {/* Esquerda - Branding (Visível apenas em telas grandes) */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-[#0B0A10] items-center justify-center p-12 overflow-hidden border-r border-[rgba(139,92,246,0.15)]">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-[10%] left-[10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px]" />
-          <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] rounded-full bg-red-600/10 blur-[120px]" />
-        </div>
+      <div 
+        className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12 overflow-hidden border-r border-[rgba(139,92,246,0.15)]"
+        style={{ backgroundImage: "url('/auth-bg.jpg')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
+        <div className="absolute inset-0 bg-[#0a0a0f]/60 backdrop-blur-[2px]" />
+        
         <div className="relative z-10 max-w-md text-center animate-fade-in-up">
-          <div className="w-20 h-20 rounded-3xl gradient-bg flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(168,85,247,0.4)]">
-            <Heart className="w-10 h-10 text-white fill-white" />
+          <div className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(168,85,247,0.4)] overflow-hidden">
+            <img src="/logo.jpg" alt="OneMatch Logo" className="w-full h-full object-cover" />
           </div>
-          <h2 className="text-4xl font-bold font-heading mb-6 leading-tight">
+          <h2 className="text-4xl font-bold font-heading mb-6 leading-tight drop-shadow-lg text-white">
             Bem-vindo de volta ao <br/><span className="gradient-text">OneMatch</span>
           </h2>
-          <p className="text-gray-400 text-lg leading-relaxed">
+          <p className="text-gray-200 text-lg leading-relaxed drop-shadow-md">
             Seu match está esperando. Faça login para continuar a conversa.
           </p>
         </div>
@@ -64,8 +65,8 @@ export default function LoginPage() {
           <div className="w-full max-w-sm animate-fade-in-up">
             {/* Header */}
             <div className="text-center mb-10 lg:text-left">
-              <div className="w-14 h-14 rounded-2xl gradient-bg flex items-center justify-center mx-auto lg:mx-0 mb-5 glow-purple lg:hidden">
-                <Heart className="w-7 h-7 text-white fill-white" />
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto lg:mx-0 mb-5 glow-purple lg:hidden overflow-hidden shadow-lg border border-purple-500/20">
+                <img src="/logo.jpg" alt="OneMatch Logo" className="w-full h-full object-cover" />
               </div>
               <h1 className="text-3xl font-bold font-heading mb-2">Entrar</h1>
               <p className="text-gray-400">Acesse sua conta OneMatch</p>
