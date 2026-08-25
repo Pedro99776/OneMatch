@@ -46,6 +46,7 @@ export default function StepIdentity({ formData, setFormData }) {
           name="date_of_birth"
           value={formData.date_of_birth}
           onChange={handleChange}
+          min={new Date(new Date().setFullYear(new Date().getFullYear() - 99)).toISOString().split('T')[0]} // Max 99 years
           max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]} // Min 18 years
           className="input-field text-base !py-3"
           required

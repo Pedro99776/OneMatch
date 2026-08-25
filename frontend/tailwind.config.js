@@ -11,11 +11,13 @@ export default {
         body: ['Inter', 'sans-serif'],
       },
       colors: {
-        'bg-primary': '#0a0a0f',
+        'bg-primary': '#0B0A10',
         'bg-secondary': '#12121a',
-        'bg-card': '#1a1a2e',
-        'bg-card-hover': '#22223a',
-        'bg-input': '#16162a',
+        'bg-card': '#15141C',
+        'bg-card-hover': '#1e1d28',
+        'bg-input': '#12121a',
+        'brand-purple': '#A855F7',
+        'brand-pink': '#EC4899',
       },
       animation: {
         'fade-in-up': 'fadeInUp 0.6s ease-out forwards',

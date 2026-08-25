@@ -49,7 +49,7 @@ class SwipeFeedView(generics.ListAPIView):
         ).values_list('to_user_id', flat=True)
 
         # — Regra 4/5: Filtro base + perfis com match ativo excluídos
-        queryset = Profile.objects.filter(
+        base_queryset = Profile.objects.filter(
             display_name__gt='',          # Só perfis com setup completo
             has_active_match=False,        # PROTEÇÃO PRINCIPAL: exclui quem já tem match
         ).exclude(
@@ -59,6 +59,8 @@ class SwipeFeedView(generics.ListAPIView):
         ).exclude(
             user_id__in=passed_user_ids    # Exclui passes recentes
         )
+
+        queryset = base_queryset
 
         # — Filtro bidirecional de gênero e preferências
         my_gender = getattr(getattr(user, 'profile', None), 'gender', '')
@@ -150,5 +152,13 @@ class SwipeFeedView(generics.ListAPIView):
                 ) * 6371.0
             ).filter(distance__lte=user_max_dist)
         # ────────────────────────────────────────────────────────────────
+
+        # Fallback se os filtros rígidos (idade, opções avançadas, distância) deixarem o feed vazio
+        if not queryset.exists():
+            # Retornamos apenas com os filtros base e de gênero (que consideramos inegociável)
+            fallback_qs = base_queryset
+            if looking_for != 'A':
+                fallback_qs = fallback_qs.filter(gender=looking_for)
+            return fallback_qs.prefetch_related('photos', 'prompts').order_by('?')[:20]
 
         return queryset.prefetch_related('photos', 'prompts').order_by('?')[:20]

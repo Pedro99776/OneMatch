@@ -38,12 +38,19 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 class UserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=False, allow_blank=True)
+    
     class Meta:
         model = User
         fields = ('id', 'email', 'username', 'password', 'phone', 'date_of_birth')
         extra_kwargs = {'password': {'write_only': True}}
         
     def create(self, validated_data):
+        import uuid
+        if 'username' not in validated_data or not validated_data['username']:
+            email = validated_data.get('email', '')
+            base_username = email.split('@')[0] if email else 'user'
+            validated_data['username'] = f"{base_username}_{uuid.uuid4().hex[:8]}"
         user = User.objects.create_user(**validated_data)
         return user
 

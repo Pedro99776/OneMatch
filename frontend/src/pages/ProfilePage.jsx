@@ -6,6 +6,8 @@ import { profileAPI } from '../services/api';
 import { reverseGeocode } from '../services/geocoding';
 import AppLayout from '../components/AppLayout';
 import { educationOptions, religionOptions, politicsOptions, childrenOptions } from '../data/choices';
+import { useToast } from '../contexts/ToastContext';
+import RangeSlider from '../components/RangeSlider';
 
 export default function ProfilePage() {
   const { profile, updateProfile, logout, loadProfile } = useAuth();
@@ -19,6 +21,7 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profileError, setProfileError] = useState('');
+  const toast = useToast();
   
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
@@ -90,7 +93,7 @@ export default function ProfilePage() {
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      alert("Seu navegador não suporta geolocalização.");
+      toast.error("Seu navegador não suporta geolocalização.");
       return;
     }
     setIsLocating(true);
@@ -108,7 +111,7 @@ export default function ProfilePage() {
       setIsLocating(false);
     }, (error) => {
       console.error(error);
-      alert("Não foi possível obter sua localização. Verifique as permissões do navegador.");
+      toast.error("Não foi possível obter sua localização. Verifique as permissões do navegador.");
       setIsLocating(false);
     });
   };
@@ -149,7 +152,7 @@ export default function ProfilePage() {
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Limite máximo de 5MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Limite máximo de 5MB.'); return; }
     setIsUploadingPhoto(true);
     try {
       const compressedFile = await compressImage(file);
@@ -160,7 +163,7 @@ export default function ProfilePage() {
       await loadProfile();
     } catch (err) {
       console.error(err);
-      alert('Erro ao enviar foto.');
+      toast.error('Erro ao enviar foto.');
     } finally {
       setIsUploadingPhoto(false);
       e.target.value = null;
@@ -172,7 +175,7 @@ export default function ProfilePage() {
       await profileAPI.deletePhoto(photoId);
       await loadProfile();
     } catch (err) {
-      alert('Erro ao excluir a foto.');
+      toast.error('Erro ao excluir a foto.');
     }
   };
 
@@ -181,7 +184,7 @@ export default function ProfilePage() {
       await profileAPI.deletePrompt(promptId);
       await loadProfile();
     } catch (err) {
-      alert('Erro ao excluir prompt.');
+      toast.error('Erro ao excluir prompt.');
     }
   };
 
@@ -190,11 +193,11 @@ export default function ProfilePage() {
     setIsChangingPassword(true);
     try {
       await profileAPI.changePassword(passwordData);
-      alert('Senha alterada com sucesso!');
+      toast.success('Senha alterada com sucesso!');
       setShowPasswordModal(false);
       setPasswordData({ current_password: '', new_password: '' });
     } catch (err) {
-      alert(err.response?.data?.error || 'Erro ao alterar senha.');
+      toast.error(err.response?.data?.error || 'Erro ao alterar senha.');
     } finally {
       setIsChangingPassword(false);
     }
@@ -207,7 +210,7 @@ export default function ProfilePage() {
       logout();
       navigate('/');
     } catch (err) {
-      alert('Erro ao excluir conta.');
+      toast.error('Erro ao excluir conta.');
       setIsDeleting(false);
     }
   };
@@ -426,7 +429,7 @@ export default function ProfilePage() {
                       <span className="text-xs text-purple-400 font-medium">{isEditing ? formData.max_distance_km : profile?.max_distance_km} km</span>
                     </div>
                     {isEditing ? (
-                      <input type="range" name="max_distance_km" min="2" max="150" value={formData.max_distance_km} onChange={handleChange} className="w-full accent-purple-500" />
+                      <RangeSlider name="max_distance_km" min="2" max="150" value={formData.max_distance_km} onChange={handleChange} />
                     ) : <div className="w-full bg-gray-800 rounded-full h-2 mt-2"><div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(profile?.max_distance_km / 150) * 100}%` }}></div></div>}
                   </div>
                   <div className="grid grid-cols-2 gap-4">

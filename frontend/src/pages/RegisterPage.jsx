@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -37,7 +36,6 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     const result = await register({
-      username: formData.username,
       email: formData.email,
       password: formData.password,
     });
@@ -86,24 +84,6 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Nome de usuário</label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <input
-                  id="register-username"
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  placeholder="seu_usuario"
-                  className="input-field !pl-12"
-                  required
-                />
-              </div>
-            </div>
-
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-2">Email</label>

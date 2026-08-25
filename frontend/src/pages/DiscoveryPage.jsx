@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, X, MapPin, Sparkles, Loader2, RefreshCw, User, Info, ArrowLeft, MessageCircle, SlidersHorizontal, Save } from 'lucide-react';
 import { discoveryAPI, matchingAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import AppLayout from '../components/AppLayout';
+import RangeSlider from '../components/RangeSlider';
 
 export default function DiscoveryPage() {
   const [profiles, setProfiles] = useState([]);
@@ -23,6 +25,7 @@ export default function DiscoveryPage() {
   const [filterError, setFilterError] = useState('');
   const [isSavingFilters, setIsSavingFilters] = useState(false);
   const navigate = useNavigate();
+  const toast = useToast();
 
   // Sincroniza filterData caso o profile seja atualizado em background
   useEffect(() => {
@@ -149,7 +152,7 @@ export default function DiscoveryPage() {
         // Não deveria acontecer (feed já bloqueia), mas como segurança extra
         navigate('/chat');
       } else if (code === 'daily_limit') {
-        alert(serverMsg || 'Você atingiu o limite de likes por dia.');
+        toast.error(serverMsg || 'Você atingiu o limite de likes por dia.');
       } else if (code === 'target_unavailable' || code === 'generic_error' || err.response?.status === 409) {
         // Erro genérico — não revela que o outro deu match com alguém
         setCurrentIndex((prev) => prev + 1);
@@ -546,14 +549,13 @@ export default function DiscoveryPage() {
                       <span className="text-sm text-purple-400 font-bold">{filterData.max_distance_km} km</span>
                     </div>
                     <div className="relative pt-2 pb-6">
-                      <input 
-                        type="range" 
+                      <RangeSlider 
                         name="max_distance_km" 
                         min="2" max="150" 
                         list="distance-markers"
                         value={filterData.max_distance_km} 
                         onChange={(e) => setFilterData({...filterData, max_distance_km: parseInt(e.target.value)})} 
-                        className="w-full accent-purple-500 relative z-10" 
+                        className="relative z-10" 
                       />
                       <datalist id="distance-markers">
                         {[25, 50, 75, 100, 125, 150].map(val => <option key={val} value={val}></option>)}

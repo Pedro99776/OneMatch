@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { MapPin, Loader2, LocateFixed, ChevronDown, ChevronUp } from 'lucide-react';
 import { reverseGeocode } from '../../services/geocoding';
 import { educationOptions, religionOptions, politicsOptions } from '../../data/choices';
+import { useToast } from '../../contexts/ToastContext';
+import RangeSlider from '../RangeSlider';
 
 export default function StepFilters({ formData, setFormData }) {
   const [isLocating, setIsLocating] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const toast = useToast();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,7 +27,7 @@ export default function StepFilters({ formData, setFormData }) {
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
-      alert("Seu navegador não suporta geolocalização.");
+      toast.error("Seu navegador não suporta geolocalização.");
       return;
     }
     
@@ -45,7 +48,7 @@ export default function StepFilters({ formData, setFormData }) {
       setIsLocating(false);
     }, (error) => {
       console.error(error);
-      alert("Não foi possível obter sua localização. Verifique as permissões do navegador.");
+      toast.error("Não foi possível obter sua localização. Verifique as permissões do navegador.");
       setIsLocating(false);
     });
   };
@@ -109,24 +112,48 @@ export default function StepFilters({ formData, setFormData }) {
             <label className="block text-sm font-medium text-gray-400">Distância Máxima</label>
             <span className="text-sm text-purple-400 font-medium">{formData.max_distance_km} km</span>
           </div>
-          <input 
-            type="range" 
+          <RangeSlider 
             name="max_distance_km" 
             min="2" max="150" 
             value={formData.max_distance_km || 50} 
             onChange={handleChange} 
-            className="w-full accent-purple-500" 
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Idade Mínima</label>
-            <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference || 18} onChange={handleChange} className="input-field text-sm" />
+            <input 
+              type="number" 
+              name="min_age_preference" 
+              min="18" max="99" 
+              value={formData.min_age_preference || 18} 
+              onChange={handleChange} 
+              onBlur={(e) => {
+                let val = parseInt(e.target.value, 10);
+                if (isNaN(val) || val < 18) val = 18;
+                if (val > 99) val = 99;
+                setFormData({ ...formData, min_age_preference: val });
+              }}
+              className="input-field text-sm" 
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Idade Máxima</label>
-            <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference || 99} onChange={handleChange} className="input-field text-sm" />
+            <input 
+              type="number" 
+              name="max_age_preference" 
+              min="18" max="99" 
+              value={formData.max_age_preference || 99} 
+              onChange={handleChange} 
+              onBlur={(e) => {
+                let val = parseInt(e.target.value, 10);
+                if (isNaN(val) || val < 18) val = 18;
+                if (val > 99) val = 99;
+                setFormData({ ...formData, max_age_preference: val });
+              }}
+              className="input-field text-sm" 
+            />
           </div>
         </div>
       </div>
