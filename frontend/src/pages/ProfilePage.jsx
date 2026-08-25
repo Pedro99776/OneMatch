@@ -34,8 +34,6 @@ export default function ProfilePage() {
   };
 
   const toast = useToast();
-  
-  const isHeightError = formData.height_cm && (formData.height_cm < 100 || formData.height_cm > 250);
 
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
@@ -58,6 +56,8 @@ export default function ProfilePage() {
     job_title: profile?.job_title || '',
     company: profile?.company || '',
   });
+
+  const isHeightError = formData.height_cm && (formData.height_cm < 100 || formData.height_cm > 250);
 
   const [isLocating, setIsLocating] = useState(false);
 
