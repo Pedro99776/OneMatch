@@ -251,12 +251,19 @@ export default function ProfilePage() {
                 const photo = profile?.photos?.[index];
                 if (photo) {
                   return (
-                    <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden group border border-[rgba(139,92,246,0.15)]">
-                      <img src={photo.image} alt="" className="w-full h-full object-cover" />
-                      <button onClick={() => handleDeletePhoto(photo.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-red-600">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                      {photo.is_primary && <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider">Perfil</div>}
+                    <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden group border border-[rgba(139,92,246,0.15)] flex flex-col">
+                      <div className="relative flex-1 w-full h-full">
+                        <img src={photo.image} alt="" className="w-full h-full object-cover" />
+                        <button onClick={() => handleDeletePhoto(photo.id)} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white hover:bg-red-600">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        {photo.is_primary && <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider">Perfil</div>}
+                      </div>
+                      {photo.caption && (
+                        <div className="absolute bottom-0 inset-x-0 p-2 bg-black/70 backdrop-blur-md">
+                          <p className="text-[10px] text-gray-200 line-clamp-2 leading-tight">{photo.caption}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 } else {
@@ -455,7 +462,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <button onClick={handleLogout} className="w-full py-3.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 mb-10">
+          <button onClick={logout} className="w-full py-3.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 mb-10">
             <LogOut className="w-4 h-4" /> Sair
           </button>
         </div>

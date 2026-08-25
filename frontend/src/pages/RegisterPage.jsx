@@ -9,7 +9,6 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    date_of_birth: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,7 +40,6 @@ export default function RegisterPage() {
       username: formData.username,
       email: formData.email,
       password: formData.password,
-      date_of_birth: formData.date_of_birth || undefined,
     });
     setIsLoading(false);
 
@@ -124,21 +122,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Date of Birth */}
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">Data de nascimento</label>
-              <div className="relative">
-                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <input
-                  id="register-dob"
-                  type="date"
-                  name="date_of_birth"
-                  value={formData.date_of_birth}
-                  onChange={handleChange}
-                  className="input-field !pl-12"
-                />
-              </div>
-            </div>
+
 
             {/* Password */}
             <div>
