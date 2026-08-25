@@ -516,7 +516,6 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
-        </div>
 
         <div className="card mb-8 overflow-hidden">
           <div 
