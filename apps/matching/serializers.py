@@ -15,10 +15,11 @@ class PartnerProfileSerializer(serializers.ModelSerializer):
     """Perfil resumido do parceiro no match — exposto para o frontend."""
     photos = ProfilePhotoSerializer(many=True, read_only=True)
     user_id = serializers.IntegerField(source='user.id', read_only=True)
+    last_login = serializers.DateTimeField(source='user.last_login', read_only=True)
 
     class Meta:
         model = Profile
-        fields = ('id', 'user_id', 'display_name', 'bio', 'gender', 'city', 'state', 'photos')
+        fields = ('id', 'user_id', 'display_name', 'bio', 'gender', 'city', 'state', 'photos', 'last_login')
 
 
 class MatchSerializer(serializers.ModelSerializer):

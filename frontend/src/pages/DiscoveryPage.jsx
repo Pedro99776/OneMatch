@@ -426,95 +426,109 @@ export default function DiscoveryPage() {
             </button>
           </div>
         ) : (
-          <div className="w-full max-w-sm">
+          <div className="w-full max-w-sm h-[70vh] max-h-[700px] flex flex-col relative">
             {/* Card */}
             <div
-              className={`relative rounded-3xl overflow-hidden bg-[#1a1a2e] border border-[rgba(139,92,246,0.15)] transition-all duration-[400ms] ${
+              className={`relative w-full h-full rounded-3xl overflow-hidden bg-[#0a0a0f] shadow-[0_0_40px_rgba(139,92,246,0.1)] border border-white/5 transition-all duration-[400ms] ${
                 swipeDirection === 'right'
                   ? 'animate-[card-swipe-right_0.4s_ease-out_forwards]'
                   : swipeDirection === 'left'
                   ? 'animate-[card-swipe-left_0.4s_ease-out_forwards]'
-                  : 'animate-fade-in'
+                  : 'animate-fade-in-up'
               }`}
             >
-              <div className="aspect-[3/4] bg-gradient-to-b from-purple-900/30 to-red-900/20 flex items-center justify-center relative">
-                {currentProfile.photos && currentProfile.photos.length > 0 ? (
-                  <img
-                    src={currentProfile.photos.find(p => p.is_primary)?.image || currentProfile.photos[0].image}
-                    alt={currentProfile.display_name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="w-24 h-24 text-gray-600/30" />
-                )}
+              {/* Imagem de Fundo Completa */}
+              {currentProfile.photos && currentProfile.photos.length > 0 ? (
+                <img
+                  src={currentProfile.photos.find(p => p.is_primary)?.image || currentProfile.photos[0].image}
+                  alt={currentProfile.display_name}
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 w-full h-full bg-[#15141c] flex flex-col items-center justify-center">
+                  <User className="w-32 h-32 text-gray-600/30 mb-4" />
+                </div>
+              )}
 
-                <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+              {/* Gradiente Inferior para legibilidade */}
+              <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black via-black/60 to-transparent pointer-events-none" />
 
-                <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-between items-end">
+              {/* Info Container */}
+              <div className="absolute bottom-24 left-0 right-0 p-6 pointer-events-none">
+                <div className="flex justify-between items-end">
                   <div>
-                    <h2 className="text-2xl font-bold text-white mb-1">{currentProfile.display_name}</h2>
-                    <div className="flex items-center gap-1.5 text-white/70 text-sm">
-                      <MapPin className="w-4 h-4" />
-                      <span>{currentProfile.city}, {currentProfile.state}</span>
+                    <h2 className="text-3xl font-bold text-white mb-2 drop-shadow-md font-heading">
+                      {currentProfile.display_name}
+                    </h2>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 text-white/90 text-sm font-medium drop-shadow-md">
+                        <MapPin className="w-4 h-4 text-purple-400" />
+                        <span>{currentProfile.city}, {currentProfile.state}</span>
+                      </div>
+                      {currentProfile.job_title && (
+                        <div className="flex items-center gap-1.5 text-white/80 text-sm drop-shadow-md">
+                          <span className="opacity-80">💼</span> {currentProfile.job_title}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button 
                     onClick={() => setShowFullProfile(true)}
-                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors pointer-events-auto shadow-lg border border-white/20"
                   >
                     <Info className="w-5 h-5" />
                   </button>
                 </div>
-
-                {swipeDirection === 'right' && (
-                  <div className="absolute top-8 left-6 px-4 py-2 rounded-xl border-2 border-green-400 text-green-400 font-bold text-xl rotate-[-15deg] animate-fade-in">
-                    LIKE 💚
-                  </div>
-                )}
-                {swipeDirection === 'left' && (
-                  <div className="absolute top-8 right-6 px-4 py-2 rounded-xl border-2 border-red-400 text-red-400 font-bold text-xl rotate-[15deg] animate-fade-in">
-                    NOPE
-                  </div>
+                {currentProfile.bio && (
+                  <p className="text-gray-300 text-sm leading-relaxed mt-4 line-clamp-2 drop-shadow-md font-medium max-w-[90%]">
+                    {currentProfile.bio}
+                  </p>
                 )}
               </div>
 
-              {currentProfile.bio && (
-                <div className="p-5 border-t border-[rgba(139,92,246,0.15)]">
-                  <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">{currentProfile.bio}</p>
+              {/* Indicadores de Swipe Animados */}
+              {swipeDirection === 'right' && (
+                <div className="absolute top-8 left-6 px-6 py-2 rounded-2xl border-4 border-green-400/80 bg-green-500/20 backdrop-blur-sm text-green-400 font-black text-3xl rotate-[-15deg] animate-fade-in shadow-[0_0_30px_rgba(74,222,128,0.4)] tracking-wider">
+                  LIKE
                 </div>
               )}
+              {swipeDirection === 'left' && (
+                <div className="absolute top-8 right-6 px-6 py-2 rounded-2xl border-4 border-red-400/80 bg-red-500/20 backdrop-blur-sm text-red-400 font-black text-3xl rotate-[15deg] animate-fade-in shadow-[0_0_30px_rgba(248,113,113,0.4)] tracking-wider">
+                  NOPE
+                </div>
+              )}
+
+              {/* Action Buttons Flutuantes (sobrepostos no final do card) */}
+              <div className="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-6">
+                <button
+                  id="discovery-pass"
+                  onClick={handlePass}
+                  className="w-16 h-16 rounded-full border border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/20 hover:border-red-500/60 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f]/80 backdrop-blur-md shadow-[0_8px_32px_rgba(220,38,38,0.2)]"
+                >
+                  <X className="w-7 h-7" />
+                </button>
+
+                <button
+                  id="discovery-super-like"
+                  onClick={() => handleLike(true)}
+                  disabled={isLiking}
+                  className="w-12 h-12 rounded-full border border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500/20 hover:border-purple-500/60 transition-all hover:scale-110 active:scale-95 bg-[#0a0a0f]/80 backdrop-blur-md shadow-[0_8px_32px_rgba(168,85,247,0.2)]"
+                >
+                  <Sparkles className="w-5 h-5" />
+                </button>
+
+                <button
+                  id="discovery-like"
+                  onClick={() => handleLike(false)}
+                  disabled={isLiking}
+                  className="w-16 h-16 rounded-full gradient-bg flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all glow-purple shadow-[0_8px_32px_rgba(168,85,247,0.4)]"
+                >
+                  <Heart className="w-7 h-7 fill-white" />
+                </button>
+              </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-center gap-6 mt-8">
-              <button
-                id="discovery-pass"
-                onClick={handlePass}
-                className="w-16 h-16 rounded-full border-2 border-red-500/30 flex items-center justify-center text-red-400 hover:bg-red-500/10 hover:border-red-500/60 transition-all hover:scale-110 active:scale-95"
-              >
-                <X className="w-7 h-7" />
-              </button>
-
-              <button
-                id="discovery-super-like"
-                onClick={() => handleLike(true)}
-                disabled={isLiking}
-                className="w-14 h-14 rounded-full border-2 border-purple-500/30 flex items-center justify-center text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/60 transition-all hover:scale-110 active:scale-95"
-              >
-                <Sparkles className="w-6 h-6" />
-              </button>
-
-              <button
-                id="discovery-like"
-                onClick={() => handleLike(false)}
-                disabled={isLiking}
-                className="w-16 h-16 rounded-full gradient-bg flex items-center justify-center text-white hover:scale-110 active:scale-95 transition-all glow-purple"
-              >
-                <Heart className="w-7 h-7 fill-white" />
-              </button>
-            </div>
-
-            <p className="text-center text-gray-500 text-xs mt-6">
+            <p className="text-center text-gray-500 text-xs mt-4">
               {currentIndex + 1} / {profiles.length} perfis
             </p>
           </div>

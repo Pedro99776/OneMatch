@@ -16,7 +16,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0a0a0f] overflow-hidden">
+    <div className="min-h-dvh bg-[#0a0a0f] overflow-x-hidden">
       {/* Ambient Background */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-purple-600/5 blur-[120px]" />
@@ -24,24 +24,26 @@ export default function LandingPage() {
         <div className="absolute top-[40%] left-[50%] w-[300px] h-[300px] rounded-full bg-purple-500/[0.03] blur-[80px]" />
       </div>
 
-      {/* Navbar */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <Heart className="w-7 h-7 text-red-400 fill-red-400" />
-          <span className="text-xl font-bold font-heading gradient-text">OneMatch</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link to="/login" className="btn-secondary !py-2.5 !px-5 text-sm">
-            <span>Entrar</span>
-          </Link>
-          <Link to="/register" className="btn-primary !py-2.5 !px-5 text-sm">
-            <span>Cadastrar</span>
-          </Link>
+      {/* Navbar Fixed */}
+      <nav className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5 transition-all duration-300">
+        <div className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
+          <div className="flex items-center gap-2.5">
+            <Heart className="w-7 h-7 text-red-400 fill-red-400" />
+            <span className="text-xl font-bold font-heading gradient-text">OneMatch</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="btn-secondary !py-2 !px-4 text-sm">
+              <span>Entrar</span>
+            </Link>
+            <Link to="/register" className="btn-primary !py-2 !px-4 text-sm hidden sm:block">
+              <span>Cadastrar</span>
+            </Link>
+          </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative z-10 flex flex-col items-center text-center px-6 pt-16 pb-24 max-w-4xl mx-auto">
+      <section className="relative z-10 flex flex-col items-center text-center px-6 pt-32 pb-24 max-w-4xl mx-auto">
         <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8 text-sm text-gray-400">

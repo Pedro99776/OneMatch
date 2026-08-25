@@ -1,6 +1,8 @@
 import { religionOptions, politicsOptions, childrenOptions } from '../../data/choices';
 
 export default function StepAbout({ formData, setFormData }) {
+  const isHeightError = formData.height_cm && (formData.height_cm < 100 || formData.height_cm > 250);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -35,10 +37,9 @@ export default function StepAbout({ formData, setFormData }) {
           value={formData.height_cm || ''}
           onChange={handleChange}
           placeholder="Ex: 175"
-          min="100"
-          max="250"
-          className="input-field text-base !py-3"
+          className={`input-field text-base !py-3 ${isHeightError ? 'border-red-500' : ''}`}
         />
+        {isHeightError && <p className="text-red-500 text-xs mt-1">A altura deve ser entre 100cm e 250cm.</p>}
       </div>
 
       <div>

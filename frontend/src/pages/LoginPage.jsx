@@ -23,32 +23,53 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#0a0a0f] flex flex-col relative overflow-hidden">
-      {/* Ambient Background */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-[-15%] right-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/5 blur-[100px]" />
-        <div className="absolute bottom-[-15%] left-[-10%] w-[400px] h-[400px] rounded-full bg-red-600/5 blur-[100px]" />
-      </div>
-
-      {/* Back */}
-      <div className="relative z-10 p-6">
-        <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-gray-100 transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm">Voltar</span>
-        </Link>
-      </div>
-
-      {/* Form */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-6 pb-12">
-        <div className="w-full max-w-md animate-fade-in-up">
-          {/* Header */}
-          <div className="text-center mb-10">
-            <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-5 glow-purple">
-              <Heart className="w-8 h-8 text-white fill-white" />
-            </div>
-            <h1 className="text-3xl font-bold font-heading mb-2">Bem-vindo de volta</h1>
-            <p className="text-gray-400">Entre na sua conta OneMatch</p>
+    <div className="min-h-dvh flex bg-[#0a0a0f] relative overflow-hidden">
+      {/* Esquerda - Branding (Visível apenas em telas grandes) */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-[#0B0A10] items-center justify-center p-12 overflow-hidden border-r border-[rgba(139,92,246,0.15)]">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-[10%] left-[10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px]" />
+          <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] rounded-full bg-red-600/10 blur-[120px]" />
+        </div>
+        <div className="relative z-10 max-w-md text-center animate-fade-in-up">
+          <div className="w-20 h-20 rounded-3xl gradient-bg flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(168,85,247,0.4)]">
+            <Heart className="w-10 h-10 text-white fill-white" />
           </div>
+          <h2 className="text-4xl font-bold font-heading mb-6 leading-tight">
+            Bem-vindo de volta ao <br/><span className="gradient-text">OneMatch</span>
+          </h2>
+          <p className="text-gray-400 text-lg leading-relaxed">
+            Seu match está esperando. Faça login para continuar a conversa.
+          </p>
+        </div>
+      </div>
+
+      {/* Direita - Formulário */}
+      <div className="w-full lg:w-1/2 flex flex-col relative min-h-dvh">
+        {/* Ambient Background Mobile */}
+        <div className="absolute inset-0 pointer-events-none lg:hidden">
+          <div className="absolute top-[-15%] right-[-10%] w-[300px] h-[300px] rounded-full bg-purple-600/5 blur-[80px]" />
+          <div className="absolute bottom-[-15%] left-[-10%] w-[300px] h-[300px] rounded-full bg-red-600/5 blur-[80px]" />
+        </div>
+
+        {/* Back */}
+        <div className="relative z-10 p-6 flex-shrink-0">
+          <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-gray-100 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-sm font-medium">Voltar</span>
+          </Link>
+        </div>
+
+        {/* Form Container */}
+        <div className="relative z-10 flex-1 flex items-center justify-center px-6 pb-12">
+          <div className="w-full max-w-sm animate-fade-in-up">
+            {/* Header */}
+            <div className="text-center mb-10 lg:text-left">
+              <div className="w-14 h-14 rounded-2xl gradient-bg flex items-center justify-center mx-auto lg:mx-0 mb-5 glow-purple lg:hidden">
+                <Heart className="w-7 h-7 text-white fill-white" />
+              </div>
+              <h1 className="text-3xl font-bold font-heading mb-2">Entrar</h1>
+              <p className="text-gray-400">Acesse sua conta OneMatch</p>
+            </div>
 
           {/* Error */}
           {error && (

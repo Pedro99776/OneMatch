@@ -32,6 +32,16 @@ function formatDateSeparator(isoString) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
+function getLastActiveText(lastLogin) {
+  if (!lastLogin) return 'Offline';
+  const loginDate = new Date(lastLogin);
+  const now = new Date();
+  const diffHours = (now - loginDate) / (1000 * 60 * 60);
+  if (diffHours < 1) return 'Online recentemente';
+  if (diffHours < 24) return `Visto há ${Math.floor(diffHours)}h`;
+  return 'Offline';
+}
+
 export default function ChatPage() {
   const [match, setMatch] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -239,17 +249,17 @@ export default function ChatPage() {
     }
   };
 
+  const myId = profile?.user_id;
+
   const otherUser = match
-    ? match.user_1?.email !== profile?.user_email
-      ? match.user_1
-      : match.user_2
+    ? match.user_1_id !== myId
+      ? match.profile_user_1
+      : match.profile_user_2
     : null;
 
   const otherPhoto = otherUser?.photos?.find(p => p.is_primary)?.image
     || otherUser?.photos?.[0]?.image
     || null;
-
-  const myId = profile?.user_id;
 
   if (isLoading) {
     return (
@@ -294,8 +304,10 @@ export default function ChatPage() {
                 <span className="text-xs text-purple-400 italic animate-pulse">digitando...</span>
               ) : (
                 <>
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <span className="text-xs text-gray-500">Match ativo</span>
+                  {otherUser?.last_login && (new Date() - new Date(otherUser.last_login)) / (1000 * 60 * 60) < 1 && (
+                    <div className="w-2 h-2 rounded-full bg-green-400" />
+                  )}
+                  <span className="text-xs text-gray-500">{getLastActiveText(otherUser?.last_login)}</span>
                 </>
               )}
             </div>
@@ -366,14 +378,14 @@ export default function ChatPage() {
               >
                 <div className={`max-w-[75%] flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`px-4 py-2.5 text-sm leading-relaxed ${
+                    className={`px-5 py-3 text-sm leading-relaxed shadow-lg ${
                       isMine
-                        ? `gradient-bg text-white ${
-                            isFirstInGroup ? 'rounded-t-2xl' : 'rounded-t-md'
-                          } ${isLastInGroup ? 'rounded-bl-2xl rounded-br-md' : 'rounded-br-md'}`
-                        : `bg-[#1a1a2e] border border-[rgba(139,92,246,0.15)] text-gray-100 ${
-                            isFirstInGroup ? 'rounded-t-2xl' : 'rounded-t-md'
-                          } ${isLastInGroup ? 'rounded-br-2xl rounded-bl-md' : 'rounded-bl-md'}`
+                        ? `bg-gradient-to-br from-purple-600 to-pink-600 text-white shadow-[0_4px_16px_rgba(168,85,247,0.3)] ${
+                            isFirstInGroup ? 'rounded-t-3xl' : 'rounded-t-[4px]'
+                          } ${isLastInGroup ? 'rounded-bl-3xl rounded-br-[4px]' : 'rounded-br-[4px] rounded-bl-3xl'}`
+                        : `bg-white/5 backdrop-blur-md border border-white/5 text-gray-100 shadow-[0_4px_16px_rgba(0,0,0,0.2)] ${
+                            isFirstInGroup ? 'rounded-t-3xl' : 'rounded-t-[4px]'
+                          } ${isLastInGroup ? 'rounded-br-3xl rounded-bl-[4px]' : 'rounded-bl-[4px] rounded-br-3xl'}`
                     }`}
                   >
                     {msg.content}

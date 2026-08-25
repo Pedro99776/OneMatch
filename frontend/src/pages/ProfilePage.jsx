@@ -21,8 +21,22 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profileError, setProfileError] = useState('');
+  
+  // Accordion states
+  const [openSections, setOpenSections] = useState({
+    info: true,
+    preferences: false,
+    security: false
+  });
+
+  const toggleSection = (section) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
   const toast = useToast();
   
+  const isHeightError = formData.height_cm && (formData.height_cm < 100 || formData.height_cm > 250);
+
   const [formData, setFormData] = useState({
     display_name: profile?.display_name || '',
     bio: profile?.bio || '',
@@ -298,23 +312,38 @@ export default function ProfilePage() {
             </div>
           )}
 
-          <div className="card p-6 mb-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-semibold">Informações do perfil</h3>
-              <button
-                onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                disabled={isSaving}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditing ? 'gradient-bg text-white' : 'border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'}`}
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditing ? <><Save className="w-4 h-4" /> Salvar</> : <><Pencil className="w-4 h-4" /> Editar</>}
-              </button>
+          <div className="card mb-6 overflow-hidden">
+            <div 
+              className="flex items-center justify-between p-6 cursor-pointer hover:bg-white/[0.02] transition-colors"
+              onClick={() => toggleSection('info')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <User className="w-5 h-5 text-purple-400" />
+                </div>
+                <h3 className="font-semibold text-lg text-gray-100">Informações do Perfil</h3>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isEditing) handleSave();
+                    else setIsEditing(true);
+                  }}
+                  disabled={isSaving}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditing ? 'gradient-bg text-white' : 'border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'}`}
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditing ? <><Save className="w-4 h-4" /> Salvar</> : <><Pencil className="w-4 h-4" /> Editar</>}
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-5">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Nome</label>
-                {isEditing ? <input type="text" name="display_name" value={formData.display_name} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100">{profile?.display_name || '—'}</p>}
-              </div>
+            <div className={`transition-all duration-300 ease-in-out ${openSections.info ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+              <div className="p-6 pt-0 space-y-6 border-t border-[rgba(139,92,246,0.1)] mt-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Nome</label>
+                  {isEditing ? <input type="text" name="display_name" value={formData.display_name} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 bg-[#16162a] p-3 rounded-xl border border-[rgba(139,92,246,0.1)]">{profile?.display_name || '—'}</p>}
+                </div>
               
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Bio</label>
@@ -343,7 +372,18 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Altura (cm)</label>
-                  {isEditing ? <input type="number" name="height_cm" value={formData.height_cm} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.height_cm ? `${profile.height_cm} cm` : '—'}</p>}
+                  {isEditing ? (
+                    <>
+                      <input 
+                        type="number" 
+                        name="height_cm" 
+                        value={formData.height_cm} 
+                        onChange={handleChange} 
+                        className={`input-field text-sm ${isHeightError ? 'border-red-500' : ''}`}
+                      />
+                      {isHeightError && <p className="text-red-500 text-xs mt-1">Inválido (100 a 250cm).</p>}
+                    </>
+                  ) : <p className="text-gray-100 text-sm">{profile?.height_cm ? `${profile.height_cm} cm` : '—'}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Filhos</label>
@@ -413,16 +453,46 @@ export default function ProfilePage() {
 
               {isEditing && (
                 <div className="pt-2">
-                  <button type="button" onClick={handleGetLocation} disabled={isLocating} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm transition-colors">
+                  <button type="button" onClick={handleGetLocation} disabled={isLocating} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors">
                     {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />} Atualizar Localização
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
 
-              <div className="pt-4 border-t border-[rgba(139,92,246,0.15)] mt-4">
-                <h4 className="text-sm font-semibold mb-4 text-gray-300">Preferências de Busca</h4>
-                {profileError && <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{profileError}</div>}
-                <div className="space-y-5">
+        <div className="card mb-6 overflow-hidden">
+          <div 
+            className="flex items-center justify-between p-6 cursor-pointer hover:bg-white/[0.02] transition-colors"
+            onClick={() => toggleSection('preferences')}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <Heart className="w-5 h-5 text-red-400" />
+              </div>
+              <h3 className="font-semibold text-lg text-gray-100">Preferências de Busca</h3>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isEditing) handleSave();
+                  else setIsEditing(true);
+                  if (!openSections.preferences && !isEditing) toggleSection('preferences');
+                }}
+                disabled={isSaving}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditing ? 'gradient-bg text-white' : 'border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'}`}
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditing ? <><Save className="w-4 h-4" /> Salvar</> : <><Pencil className="w-4 h-4" /> Editar</>}
+              </button>
+            </div>
+          </div>
+
+          <div className={`transition-all duration-300 ease-in-out ${openSections.preferences ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+            <div className="p-6 pt-0 border-t border-[rgba(139,92,246,0.1)] mt-2">
+              {profileError && <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{profileError}</div>}
+              <div className="space-y-6">
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Distância Máxima</label>
@@ -444,16 +514,23 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
+        </div>
 
-          <div className="card p-6 mb-8">
-            <div className="flex items-center gap-2 mb-5">
-              <Shield className="w-5 h-5 text-purple-400" />
-              <h3 className="font-semibold">Segurança da Conta</h3>
+        <div className="card mb-8 overflow-hidden">
+          <div 
+            className="flex items-center gap-3 p-6 cursor-pointer hover:bg-white/[0.02] transition-colors"
+            onClick={() => toggleSection('security')}
+          >
+            <div className="w-10 h-10 rounded-full bg-gray-500/10 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-gray-400" />
             </div>
-            <div className="space-y-4">
+            <h3 className="font-semibold text-lg text-gray-100">Segurança da Conta</h3>
+          </div>
+          
+          <div className={`transition-all duration-300 ease-in-out ${openSections.security ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+            <div className="p-6 pt-0 border-t border-[rgba(139,92,246,0.1)] mt-2 space-y-4">
               <button onClick={() => setShowPasswordModal(true)} className="w-full flex items-center p-4 rounded-xl bg-[#16162a] border border-[rgba(139,92,246,0.15)] hover:border-purple-500/40 transition-colors">
                 <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center mr-3"><Lock className="w-5 h-5 text-purple-400" /></div>
                 <div className="text-left"><h4 className="text-sm font-medium text-gray-200">Alterar Senha</h4><p className="text-xs text-gray-500">Atualize sua senha</p></div>
@@ -464,6 +541,7 @@ export default function ProfilePage() {
               </button>
             </div>
           </div>
+        </div>
 
           <button onClick={logout} className="w-full py-3.5 rounded-xl border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-2 mb-10">
             <LogOut className="w-4 h-4" /> Sair

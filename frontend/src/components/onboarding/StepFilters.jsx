@@ -10,6 +10,9 @@ export default function StepFilters({ formData, setFormData }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const toast = useToast();
 
+  const isMinAgeError = formData.min_age_preference && (formData.min_age_preference < 18 || formData.min_age_preference > 99);
+  const isMaxAgeError = formData.max_age_preference && (formData.max_age_preference < 18 || formData.max_age_preference > 99);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -126,34 +129,22 @@ export default function StepFilters({ formData, setFormData }) {
             <input 
               type="number" 
               name="min_age_preference" 
-              min="18" max="99" 
-              value={formData.min_age_preference || 18} 
+              value={formData.min_age_preference || ''} 
               onChange={handleChange} 
-              onBlur={(e) => {
-                let val = parseInt(e.target.value, 10);
-                if (isNaN(val) || val < 18) val = 18;
-                if (val > 99) val = 99;
-                setFormData({ ...formData, min_age_preference: val });
-              }}
-              className="input-field text-sm" 
+              className={`input-field text-sm ${isMinAgeError ? 'border-red-500' : ''}`}
             />
+            {isMinAgeError && <p className="text-red-500 text-xs mt-1">Idade inválida (18 a 99).</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Idade Máxima</label>
             <input 
               type="number" 
               name="max_age_preference" 
-              min="18" max="99" 
-              value={formData.max_age_preference || 99} 
+              value={formData.max_age_preference || ''} 
               onChange={handleChange} 
-              onBlur={(e) => {
-                let val = parseInt(e.target.value, 10);
-                if (isNaN(val) || val < 18) val = 18;
-                if (val > 99) val = 99;
-                setFormData({ ...formData, max_age_preference: val });
-              }}
-              className="input-field text-sm" 
+              className={`input-field text-sm ${isMaxAgeError ? 'border-red-500' : ''}`}
             />
+            {isMaxAgeError && <p className="text-red-500 text-xs mt-1">Idade inválida (18 a 99).</p>}
           </div>
         </div>
       </div>
