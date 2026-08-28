@@ -8,7 +8,7 @@ export default function NavSidebar({ navItems }) {
   return (
     <aside className="hidden md:flex flex-col w-20 lg:w-64 border-r border-[rgba(139,92,246,0.15)] bg-[#0B0A10] h-full flex-shrink-0 z-20">
       <div className="flex items-center justify-center lg:justify-start gap-3 p-6 h-[72px]">
-        <img src="/logo.jpg" alt="OneMatch" className="w-8 h-8 rounded-lg flex-shrink-0" />
+        <img src="/logo-icon.jpg" alt="OneMatch" className="w-8 h-8 rounded-lg flex-shrink-0" />
         <span className="text-2xl font-bold font-heading gradient-text hidden lg:block">OneMatch</span>
       </div>
 
