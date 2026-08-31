@@ -212,19 +212,16 @@ SIMPLE_JWT = {
 }
 
 # Configuração do Django Channels (Redis)
-# Pega a URL do Redis, mas remove parâmetros extras (?...) que podem causar TimeoutError no BZPOPMIN
 raw_redis_url = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
-clean_redis_url = raw_redis_url.split('?')[0]
 
+# Para Upstash, certifique-se de que a URL começa com rediss:// se usar TLS
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [{
-                "address": clean_redis_url,
-                "socket_timeout": None,
-                "health_check_interval": 0,
-            }],
+            "hosts": [raw_redis_url],
+            # Opções recomendadas para serviços serverless como Upstash:
+            # - ping_interval / ping_timeout (em versões recentes do channels_redis/redis-py) podem ser passados na URL
         },
     },
 }
