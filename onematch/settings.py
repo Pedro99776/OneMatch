@@ -217,11 +217,11 @@ raw_redis_url = os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379')
 # Para Upstash, certifique-se de que a URL começa com rediss:// se usar TLS
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
         "CONFIG": {
             "hosts": [raw_redis_url],
-            # Opções recomendadas para serviços serverless como Upstash:
-            # - ping_interval / ping_timeout (em versões recentes do channels_redis/redis-py) podem ser passados na URL
+            # RedisPubSubChannelLayer é muito mais resiliente para serviços como Upstash
+            # pois usa Pub/Sub em vez de BZPOPMIN (que sofre timeouts em conexões ociosas).
         },
     },
 }
