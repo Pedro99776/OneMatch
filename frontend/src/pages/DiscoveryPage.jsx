@@ -98,26 +98,50 @@ export default function DiscoveryPage() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('http://', '').replace('https://', '') : window.location.host;
     
-    const ws = new WebSocket(`${protocol}//${host}/ws/notifications/?token=${token}`);
-    
-    ws.onmessage = async (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'match_created') {
-          const matchResponse = await matchingAPI.getCurrentMatch();
-          if (matchResponse.data && matchResponse.data.id) {
-            const otherUser = matchResponse.data.user_1?.email !== profile?.user_email ? matchResponse.data.user_1 : matchResponse.data.user_2;
-            setShowMatch(otherUser);
-            await loadProfile();
+    let ws = null;
+    let retryCount = 0;
+    let reconnectTimer = null;
+    let isMounted = true;
+
+    const connectWS = () => {
+      if (!isMounted) return;
+      ws = new WebSocket(`${protocol}//${host}/ws/notifications/?token=${token}`);
+      
+      ws.onopen = () => {
+        retryCount = 0;
+      };
+      
+      ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'match_created') {
+            const matchResponse = await matchingAPI.getCurrentMatch();
+            if (matchResponse.data && matchResponse.data.id) {
+              const otherUser = matchResponse.data.user_1?.user_id !== profile?.user_id ? matchResponse.data.user_1 : matchResponse.data.user_2;
+              setShowMatch(otherUser);
+              await loadProfile();
+            }
           }
+        } catch (err) {
+          console.error('Error handling WS notification:', err);
         }
-      } catch (err) {
-        console.error('Error handling WS notification:', err);
-      }
+      };
+
+      ws.onclose = () => {
+        if (!isMounted) return;
+        const timeout = Math.min(1000 * (2 ** retryCount), 30000);
+        retryCount += 1;
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(connectWS, timeout);
+      };
     };
 
+    connectWS();
+
     return () => {
-      ws.close();
+      isMounted = false;
+      clearTimeout(reconnectTimer);
+      if (ws) ws.close();
     };
   }, [profile, showMatch, loadProfile]);
 

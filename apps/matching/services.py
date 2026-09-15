@@ -109,11 +109,13 @@ class MatchService:
             mutual_like.is_active = False
             mutual_like.save()
             
-            Like.objects.create(
+            Like.objects.update_or_create(
                 from_user=from_user,
                 to_user=to_user,
-                like_type=like_type,
-                is_active=False
+                defaults={
+                    'like_type': like_type,
+                    'is_active': False
+                }
             )
             
             # 4. Cria a sala de chat (Conversation)

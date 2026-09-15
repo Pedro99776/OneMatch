@@ -56,6 +56,8 @@ export default function ChatPage() {
   const typingTimerRef = useRef(null);
   const sendTypingTimerRef = useRef(null);
   const markReadTimerRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const retryCountRef = useRef(0);
 
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -138,6 +140,7 @@ export default function ChatPage() {
       else if (wsRef.current) wsRef.current.close();
       clearTimeout(typingTimerRef.current);
       clearTimeout(sendTypingTimerRef.current);
+      clearTimeout(reconnectTimerRef.current);
     };
   }, [navigate, emitMarkRead]);
 
@@ -153,7 +156,20 @@ export default function ChatPage() {
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      retryCountRef.current = 0;
       emitMarkRead();
+    };
+
+    ws.onclose = () => {
+      const timeout = Math.min(1000 * (2 ** retryCountRef.current), 30000);
+      retryCountRef.current += 1;
+      
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = setTimeout(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          connectWebSocket(matchId);
+        }
+      }, timeout);
     };
 
     ws.onmessage = (event) => {

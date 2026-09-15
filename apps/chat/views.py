@@ -26,12 +26,12 @@ class MessageListView(generics.ListAPIView):
         ).select_related('sender__profile').order_by('-created_at')[:100]
         
         # Inverte para retornar na ordem correta (mais antigas primeiro)
-        return reversed(messages)
+        return list(reversed(messages))
         
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         # Se retornou vazio (não pertence à conversa ou sem mensagens)
-        if not queryset and not isinstance(queryset, reversed):
+        if not queryset and not isinstance(queryset, list):
             return Response({"error": "Acesso negado ou chat não existe."}, status=status.HTTP_403_FORBIDDEN)
             
         serializer = self.get_serializer(queryset, many=True)

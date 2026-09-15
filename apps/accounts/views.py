@@ -99,6 +99,16 @@ class ProfilePhotoUploadView(APIView):
             if not mime_type or mime_type not in allowed_types:
                 return Response({"error": "Apenas imagens JPG, PNG ou WEBP são permitidas."}, status=status.HTTP_400_BAD_REQUEST)
             
+            # Validação real do conteúdo com Pillow
+            try:
+                from PIL import Image
+                img = Image.open(photo)
+                img.verify()
+                # Retorna o ponteiro do arquivo para o início após o verify
+                photo.seek(0)
+            except Exception:
+                return Response({"error": "O arquivo enviado não é uma imagem válida."}, status=status.HTTP_400_BAD_REQUEST)
+            
         serializer = ProfilePhotoSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(profile=profile)
@@ -129,11 +139,15 @@ class ProfilePhotoReorderView(APIView):
         # Validar segurança (verificar se as fotos pertencem ao usuário)
         existing_photos = {p.id: p for p in profile.photos.all()}
         
+        photos_to_update = []
         for idx, p_id in enumerate(photo_ids):
             if p_id in existing_photos:
                 photo = existing_photos[p_id]
                 photo.order = idx
-                photo.save(update_fields=['order'])
+                photos_to_update.append(photo)
+                
+        if photos_to_update:
+            ProfilePhoto.objects.bulk_update(photos_to_update, ['order'])
                 
         return Response({"status": "Reordenado com sucesso."})
 
@@ -175,6 +189,14 @@ class ChangePasswordView(APIView):
         if not user.check_password(current_password):
             return Response({"error": "Senha atual incorreta."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Valida a nova senha com os validadores do Django
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
+
         user.set_password(new_password)
         user.save()
         return Response({"success": "Senha alterada com sucesso."}, status=status.HTTP_200_OK)
@@ -185,5 +207,13 @@ class DeleteAccountView(APIView):
 
     def delete(self, request, *args, **kwargs):
         user = request.user
+        password = request.data.get('password')
+
+        if not password:
+            return Response({"error": "A senha atual é obrigatória para excluir a conta."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if not user.check_password(password):
+            return Response({"error": "Senha incorreta."}, status=status.HTTP_400_BAD_REQUEST)
+
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

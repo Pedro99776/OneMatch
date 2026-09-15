@@ -144,6 +144,17 @@ class SwipeFeedView(generics.ListAPIView):
         user_max_dist = getattr(my_profile, 'max_distance_km', 50)
         
         if user_lat is not None and user_lon is not None:
+            import math
+            lat_delta = user_max_dist / 111.0
+            lon_delta = user_max_dist / (111.0 * abs(math.cos(math.radians(user_lat))))
+            
+            queryset = queryset.filter(
+                latitude__gte=user_lat - lat_delta,
+                latitude__lte=user_lat + lat_delta,
+                longitude__gte=user_lon - lon_delta,
+                longitude__lte=user_lon + lon_delta
+            )
+            
             queryset = queryset.annotate(
                 distance=ACos(
                     Cos(Radians(user_lat)) * Cos(Radians(F('latitude'))) *
@@ -154,11 +165,17 @@ class SwipeFeedView(generics.ListAPIView):
         # ────────────────────────────────────────────────────────────────
 
         # Fallback se os filtros rígidos (idade, opções avançadas, distância) deixarem o feed vazio
-        if not queryset.exists():
+        results = list(queryset.prefetch_related('photos', 'prompts').order_by('?')[:20])
+
+        if not results:
             # Retornamos apenas com os filtros base e de gênero (que consideramos inegociável)
             fallback_qs = base_queryset
             if looking_for != 'A':
                 fallback_qs = fallback_qs.filter(gender=looking_for)
-            return fallback_qs.prefetch_related('photos', 'prompts').order_by('?')[:20]
+            if my_gender:
+                fallback_qs = fallback_qs.filter(
+                    Q(looking_for=my_gender) | Q(looking_for='A')
+                )
+            results = list(fallback_qs.prefetch_related('photos', 'prompts').order_by('?')[:20])
 
-        return queryset.prefetch_related('photos', 'prompts').order_by('?')[:20]
+        return results
