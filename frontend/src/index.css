@@ -60,6 +60,10 @@ html {
 }
 
 body {
+  padding-top: var(--sat);
+  padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
   font-family: 'Inter', sans-serif;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
