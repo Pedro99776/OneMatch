@@ -1,15 +1,22 @@
 import { Heart, Shield, Sparkles, ArrowRight, Users, MessageCircleHeart } from 'lucide-react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LandingPage() {
   const [isVisible, setIsVisible] = useState(false);
   const { isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    setIsVisible(true);
-  }, []);
+    // Se for mobile, não mostra a landing page, vai direto pro login/register
+    const isMobile = window.Capacitor && window.Capacitor.isNativePlatform();
+    if (isMobile) {
+      navigate('/login', { replace: true });
+    } else {
+      setIsVisible(true);
+    }
+  }, [navigate]);
 
   if (!loading && isAuthenticated) {
     return <Navigate to="/discover" replace />;
@@ -25,7 +32,10 @@ export default function LandingPage() {
       </div>
 
       {/* Navbar Fixed */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5 transition-all duration-300">
+      <nav 
+        className="fixed top-0 left-0 right-0 z-50 glass-strong border-b border-white/5 transition-all duration-300"
+        style={{ paddingTop: 'var(--sat)' }}
+      >
         <div className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
           <div className="flex items-center gap-2.5">
             <Heart className="w-7 h-7 text-red-400 fill-red-400" />
@@ -43,7 +53,10 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="relative z-10 flex flex-col items-center text-center px-6 pt-32 pb-24 max-w-4xl mx-auto">
+      <section 
+        className="relative z-10 flex flex-col items-center text-center px-6 pb-24 max-w-4xl mx-auto"
+        style={{ paddingTop: 'calc(var(--sat) + 8rem)' }}
+      >
         <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8 text-sm text-gray-400">

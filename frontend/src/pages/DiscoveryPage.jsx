@@ -6,11 +6,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import AppLayout from '../components/AppLayout';
 import RangeSlider from '../components/RangeSlider';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { Capacitor } from '@capacitor/core';
+
+// Cache simples em memória para manter a sessão ao navegar entre abas
+let cachedProfiles = [];
+let cachedCurrentIndex = 0;
+let cacheTimestamp = 0;
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutos
 
 export default function DiscoveryPage() {
-  const [profiles, setProfiles] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [profiles, setProfiles] = useState(cachedProfiles);
+  const [currentIndex, setCurrentIndex] = useState(cachedCurrentIndex);
+  const [isLoading, setIsLoading] = useState(cachedProfiles.length === 0);
   const [isLiking, setIsLiking] = useState(false);
   const [swipeDirection, setSwipeDirection] = useState(null);
   const [showMatch, setShowMatch] = useState(null);
@@ -69,12 +77,26 @@ export default function DiscoveryPage() {
     loadFeed();
   };
 
-  const loadFeed = useCallback(async () => {
+  const loadFeed = useCallback(async (force = false) => {
+    // Se não for forçado e o cache for válido, não recarrega
+    if (!force && cachedProfiles.length > 0 && (Date.now() - cacheTimestamp < CACHE_TTL)) {
+      setProfiles(cachedProfiles);
+      setCurrentIndex(cachedCurrentIndex);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data } = await discoveryAPI.getFeed();
-      setProfiles(Array.isArray(data) ? data : data.results || []);
+      const newProfiles = Array.isArray(data) ? data : data.results || [];
+      setProfiles(newProfiles);
       setCurrentIndex(0);
+      
+      // Atualiza o cache
+      cachedProfiles = newProfiles;
+      cachedCurrentIndex = 0;
+      cacheTimestamp = Date.now();
     } catch (err) {
       console.error('Error loading feed:', err);
     } finally {
@@ -152,19 +174,32 @@ export default function DiscoveryPage() {
     setIsLiking(true);
     setSwipeDirection('right');
 
+    // Haptic feedback ao dar like (vibração leve)
+    if (Capacitor.isNativePlatform()) {
+      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+    }
+
     try {
       // Usa user_id (não profile id) para identificar o destinatário do like
       const { data } = await matchingAPI.giveLike(currentProfile.user_id, isSuperLike);
 
       if (data.is_match) {
+        // Haptic feedback de match! (vibração forte de sucesso)
+        if (Capacitor.isNativePlatform()) {
+          Haptics.notification({ type: NotificationType.Success }).catch(() => {});
+        }
         setTimeout(() => {
           setSwipeDirection(null);
           setShowMatch(currentProfile);
+          cachedCurrentIndex = currentIndex + 1; // atualiza o cache
         }, 400);
       } else {
         setTimeout(() => {
           setSwipeDirection(null);
-          setCurrentIndex((prev) => prev + 1);
+          setCurrentIndex((prev) => {
+            cachedCurrentIndex = prev + 1;
+            return prev + 1;
+          });
         }, 400);
       }
     } catch (err) {
@@ -202,7 +237,10 @@ export default function DiscoveryPage() {
 
     setTimeout(() => {
       setSwipeDirection(null);
-      setCurrentIndex((prev) => prev + 1);
+      setCurrentIndex((prev) => {
+        cachedCurrentIndex = prev + 1;
+        return prev + 1;
+      });
     }, 400);
   };
 
@@ -245,7 +283,7 @@ export default function DiscoveryPage() {
 
   if (profile?.has_active_match) {
     return (
-      <AppLayout>
+      <AppLayout disableScroll={true}>
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
           <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-6">
             <Heart className="w-10 h-10 text-red-500 fill-red-500" />
@@ -266,13 +304,13 @@ export default function DiscoveryPage() {
 
   if (showFullProfile && currentProfile) {
     return (
-      <AppLayout>
+      <AppLayout disableScroll={false}>
         <div className="flex-1 overflow-y-auto bg-[#0a0a0f] relative hide-scrollbar flex justify-center">
           <div className="w-full max-w-md relative pb-32">
-            {/* Header/Back button fixed at top */}
-            <button 
+               <button 
             onClick={() => setShowFullProfile(false)}
-            className="fixed top-4 left-4 z-[60] w-11 h-11 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors backdrop-blur-md border border-white/20"
+            className="back-button-intercept fixed z-[110] w-11 h-11 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors backdrop-blur-md border border-white/20"
+            style={{ top: 'calc(var(--sat) + 12px)', left: '16px' }}
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
@@ -283,8 +321,16 @@ export default function DiscoveryPage() {
             {/* Primeira Foto (Primary) */}
             {currentProfile.photos && currentProfile.photos.length > 0 ? (
               <div className="relative w-full aspect-[4/5] bg-[#1a1a2e]">
-                <img src={currentProfile.photos[0].image} alt="Profile" className="w-full h-full object-cover" />
+                <img src={currentProfile.photos.find(p => p.is_primary)?.image || currentProfile.photos[0].image} alt="Profile" className="w-full h-full object-cover" />
                 <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/80 to-transparent flex flex-col justify-end p-6">
+                  {(() => {
+                    const primary = currentProfile.photos.find(p => p.is_primary) || currentProfile.photos[0];
+                    return primary.caption ? (
+                      <p className="text-white/90 text-sm mb-3 font-medium bg-black/40 inline-block px-3 py-1.5 rounded-lg backdrop-blur-sm self-start">
+                        {primary.caption}
+                      </p>
+                    ) : null;
+                  })()}
                   <h2 className="text-3xl font-bold text-white mb-1">{currentProfile.display_name}</h2>
                   <div className="flex items-center gap-1.5 text-purple-300 font-medium">
                     <MapPin className="w-4 h-4" />
@@ -416,13 +462,16 @@ export default function DiscoveryPage() {
   }
 
   return (
-    <AppLayout>
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 relative">
-        {/* Filters Button */}
-        <div className="absolute top-4 right-6 z-10">
+    <AppLayout disableScroll={true}>
+      <div className="flex-1 flex flex-col items-center justify-center pb-12 px-6 relative overflow-hidden" style={{ paddingTop: 'calc(var(--sat) + 10px)' }}>
+        {/* Filters Button (reposicionado no topo centralizado ou no canto, garantindo z-index alto) */}
+        <div 
+          className="fixed z-[60]"
+          style={{ top: 'calc(var(--sat) + 16px)', right: '16px' }}
+        >
           <button 
             onClick={() => setShowFilters(true)}
-            className="w-10 h-10 rounded-full bg-[#1a1a2e] border border-[rgba(139,92,246,0.2)] flex items-center justify-center text-purple-400 hover:bg-[rgba(139,92,246,0.1)] transition-colors shadow-lg"
+            className="w-10 h-10 rounded-full bg-[#1a1a2e]/80 backdrop-blur-md border border-[rgba(139,92,246,0.3)] flex items-center justify-center text-purple-400 hover:bg-[rgba(139,92,246,0.2)] transition-colors shadow-lg"
           >
             <SlidersHorizontal className="w-5 h-5" />
           </button>
@@ -442,7 +491,7 @@ export default function DiscoveryPage() {
             <p className="text-gray-400 mb-8 max-w-sm mx-auto">
               Não encontramos mais perfis para você no momento. Volte mais tarde!
             </p>
-            <button onClick={loadFeed} className="btn-secondary group">
+            <button onClick={() => loadFeed(true)} className="btn-secondary group">
               <span className="flex items-center gap-2">
                 <RefreshCw className="w-5 h-5 transition-transform group-hover:rotate-180 duration-500" />
                 Atualizar feed
@@ -450,7 +499,7 @@ export default function DiscoveryPage() {
             </button>
           </div>
         ) : (
-          <div className="w-full max-w-sm h-[70vh] max-h-[700px] flex flex-col relative">
+          <div className="w-full max-w-sm h-[70vh] max-h-[650px] flex flex-col relative mb-4">
             {/* Card */}
             <div
               className={`relative w-full h-full rounded-3xl overflow-hidden bg-[#0a0a0f] shadow-[0_0_40px_rgba(139,92,246,0.1)] border border-white/5 transition-all duration-[400ms] ${
@@ -551,10 +600,6 @@ export default function DiscoveryPage() {
                 </button>
               </div>
             </div>
-
-            <p className="text-center text-gray-500 text-xs mt-4">
-              {currentIndex + 1} / {profiles.length} perfis
-            </p>
           </div>
         )}
 
@@ -570,7 +615,7 @@ export default function DiscoveryPage() {
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold font-heading">Filtros de Busca</h3>
-                  <button onClick={() => setShowFilters(false)} type="button" className="text-gray-500 hover:text-white transition-colors">
+                  <button onClick={() => setShowFilters(false)} type="button" className="back-button-intercept text-gray-500 hover:text-white transition-colors">
                     <X className="w-6 h-6" />
                   </button>
                 </div>
@@ -584,7 +629,15 @@ export default function DiscoveryPage() {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <label className="block text-sm font-medium text-gray-300">Distância Máxima</label>
-                      <span className="text-sm text-purple-400 font-bold">{filterData.max_distance_km} km</span>
+                      <div className="flex items-center gap-1">
+                        <input 
+                          type="number" 
+                          value={filterData.max_distance_km} 
+                          onChange={(e) => setFilterData({...filterData, max_distance_km: parseInt(e.target.value) || 2})}
+                          className="bg-[#1a1a2e] border border-[rgba(139,92,246,0.3)] rounded-md text-purple-400 font-bold text-sm w-16 text-center px-1 py-0.5 focus:outline-none focus:border-purple-500"
+                        />
+                        <span className="text-sm text-purple-400 font-bold">km</span>
+                      </div>
                     </div>
                     <div className="relative pt-2 pb-6">
                       <RangeSlider 
@@ -592,7 +645,13 @@ export default function DiscoveryPage() {
                         min="2" max="150" 
                         list="distance-markers"
                         value={filterData.max_distance_km} 
-                        onChange={(e) => setFilterData({...filterData, max_distance_km: parseInt(e.target.value)})} 
+                        onChange={(e) => {
+                          let val = parseInt(e.target.value);
+                          const anchors = [25, 50, 75, 100, 125, 150];
+                          const closest = anchors.find(a => Math.abs(a - val) <= 4);
+                          if (closest) val = closest;
+                          setFilterData({...filterData, max_distance_km: val});
+                        }} 
                         className="relative z-10" 
                       />
                       <datalist id="distance-markers">

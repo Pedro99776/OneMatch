@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Send, ArrowLeft, Loader2, User, AlertTriangle, X, CheckCheck, Check } from 'lucide-react';
 import { matchingAPI, chatAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import ProfilePreviewModal from '../components/profile/ProfilePreviewModal';
 
 // Formata data ISO para HH:mm
 function formatTime(isoString) {
@@ -48,6 +49,7 @@ export default function ChatPage() {
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showUnmatchModal, setShowUnmatchModal] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [isUnmatching, setIsUnmatching] = useState(false);
   // Mapa de msg_id -> is_read para atualizacao em tempo real
   const [readMap, setReadMap] = useState({});
@@ -292,7 +294,10 @@ export default function ChatPage() {
     <div className="h-dvh bg-[#0a0a0f] flex flex-col">
 
       {/* Header */}
-      <header className="flex items-center gap-4 px-5 py-4 glass-strong border-b border-[rgba(139,92,246,0.15)] flex-shrink-0">
+      <header 
+        className="flex items-center gap-4 px-5 pb-4 glass-strong border-b border-[rgba(139,92,246,0.15)] flex-shrink-0"
+        style={{ paddingTop: 'calc(var(--sat) + 16px)' }}
+      >
         <button
           onClick={() => navigate(-1)}
           className="text-gray-400 hover:text-gray-100 transition-colors"
@@ -300,7 +305,10 @@ export default function ChatPage() {
           <ArrowLeft className="w-6 h-6" />
         </button>
 
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div 
+          className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:bg-white/5 rounded-xl p-1 -ml-1 transition-colors"
+          onClick={() => setShowProfile(true)}
+        >
           <div className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden border-2 border-purple-500/30">
             {otherPhoto ? (
               <img src={otherPhoto} alt={otherUser?.display_name} className="w-full h-full object-cover" />
@@ -497,6 +505,11 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Profile Preview Modal */}
+      {showProfile && otherUser && (
+        <ProfilePreviewModal profile={otherUser} onClose={() => setShowProfile(false)} />
       )}
     </div>
   );

@@ -4,11 +4,12 @@ export default function ProfilePreviewModal({ profile, onClose }) {
   if (!profile) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex justify-center overflow-y-auto">
-      <div className="w-full max-w-md relative pb-32 bg-[#0a0a0f] min-h-dvh">
+    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex justify-center overflow-y-auto hide-scrollbar">
+      <div className="w-full max-w-md relative bg-[#0a0a0f] min-h-dvh" style={{ paddingTop: 'var(--sat)', paddingBottom: 'calc(var(--sab) + 80px)' }}>
         <button 
           onClick={onClose}
-          className="fixed top-4 left-4 z-[60] w-11 h-11 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors backdrop-blur-md border border-white/20"
+          className="back-button-intercept fixed z-[110] w-11 h-11 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80 transition-colors backdrop-blur-md border border-white/20"
+          style={{ top: 'calc(var(--sat) + 12px)', left: '16px' }}
         >
           <X className="w-6 h-6" />
         </button>
@@ -19,6 +20,14 @@ export default function ProfilePreviewModal({ profile, onClose }) {
             <div className="relative w-full aspect-[4/5] bg-[#1a1a2e]">
               <img src={profile.photos.find(p => p.is_primary)?.image || profile.photos[0].image} alt="Profile" className="w-full h-full object-cover" />
               <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/80 to-transparent flex flex-col justify-end p-6">
+                {(() => {
+                  const primary = profile.photos.find(p => p.is_primary) || profile.photos[0];
+                  return primary.caption ? (
+                    <p className="text-white/90 text-sm mb-3 font-medium bg-black/40 inline-block px-3 py-1.5 rounded-lg backdrop-blur-sm self-start">
+                      {primary.caption}
+                    </p>
+                  ) : null;
+                })()}
                 <h2 className="text-3xl font-bold text-white mb-1">{profile.display_name}</h2>
                 <div className="flex items-center gap-1.5 text-purple-300 font-medium">
                   <MapPin className="w-4 h-4" />

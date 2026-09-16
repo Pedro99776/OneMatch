@@ -52,14 +52,6 @@ export default function LoginPage() {
           <div className="absolute bottom-[-15%] left-[-10%] w-[300px] h-[300px] rounded-full bg-red-600/5 blur-[80px]" />
         </div>
 
-        {/* Back */}
-        <div className="relative z-10 p-6 flex-shrink-0">
-          <Link to="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-gray-100 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-            <span className="text-sm font-medium">Voltar</span>
-          </Link>
-        </div>
-
         {/* Form Container */}
         <div className="relative z-10 flex-1 flex items-center justify-center px-6 pb-12">
           <div className="w-full max-w-sm animate-fade-in-up">

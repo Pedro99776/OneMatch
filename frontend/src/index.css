@@ -8,6 +8,12 @@
    ======================================== */
 
 :root {
+  /* Safe Areas (para notch/barra de navegação em dispositivos móveis) */
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+
   /* Colors — Dark Purple/Red Palette */
   --color-bg-primary: #0B0A10;
   --color-bg-secondary: #12121a;
@@ -53,6 +59,15 @@
   box-sizing: border-box;
 }
 
+/* Hide scrollbar on all browsers but keep scroll functional */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
@@ -60,10 +75,6 @@ html {
 }
 
 body {
-  padding-top: var(--sat);
-  padding-bottom: var(--sab);
-  padding-left: var(--sal);
-  padding-right: var(--sar);
   font-family: 'Inter', sans-serif;
   background: var(--color-bg-primary);
   color: var(--color-text-primary);

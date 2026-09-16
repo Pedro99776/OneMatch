@@ -10,11 +10,14 @@ import { PROMPTS_LIST } from '../data/promptsList';
 import { useToast } from '../contexts/ToastContext';
 import RangeSlider from '../components/RangeSlider';
 import ProfilePreviewModal from '../components/profile/ProfilePreviewModal';
+import { Geolocation } from '@capacitor/geolocation';
+import { Capacitor } from '@capacitor/core';
 
 export default function ProfilePage() {
   const { profile, updateProfile, logout, loadProfile } = useAuth();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
+  const [isEditingPreferences, setIsEditingPreferences] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -39,6 +42,8 @@ export default function ProfilePage() {
   const [showDobModal, setShowDobModal] = useState(false);
   const [dobText, setDobText] = useState(user?.date_of_birth || '');
   const [isChangingDob, setIsChangingDob] = useState(false);
+
+  const [uploadPreview, setUploadPreview] = useState(null);
 
   
   // Accordion states
@@ -121,33 +126,89 @@ export default function ProfilePage() {
     const result = await updateProfile(validatedData);
     setIsSaving(false);
     if (result.success) {
-      setIsEditing(false);
+      setIsEditingInfo(false);
+      setIsEditingPreferences(false);
     }
   };
 
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error("Seu navegador não suporta geolocalização.");
-      return;
-    }
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      const geoResult = await reverseGeocode(lat, lng);
+  const handleCancelInfo = () => {
+    setIsEditingInfo(false);
+    setProfileError('');
+    if (profile) {
       setFormData(prev => ({
         ...prev,
-        latitude: lat,
-        longitude: lng,
-        city: geoResult?.city || prev.city,
-        state: geoResult?.state || prev.state
+        ...profile,
+        height_cm: profile.height_cm || '',
       }));
-      setIsLocating(false);
-    }, (error) => {
+    }
+  };
+
+  const handleCancelPreferences = () => {
+    setIsEditingPreferences(false);
+    setProfileError('');
+    if (profile) {
+      setFormData(prev => ({
+        ...prev,
+        ...profile,
+        height_cm: profile.height_cm || '',
+      }));
+    }
+  };
+
+  const handleGetLocation = async () => {
+    setIsLocating(true);
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const perm = await Geolocation.checkPermissions();
+        if (perm.location !== 'granted') {
+          const req = await Geolocation.requestPermissions();
+          if (req.location !== 'granted') {
+            toast.error("Permissão de localização negada.", { id: 'geo_error' });
+            setIsLocating(false);
+            return;
+          }
+        }
+        const pos = await Geolocation.getCurrentPosition();
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const geoResult = await reverseGeocode(lat, lng);
+        setFormData(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          city: geoResult?.city || prev.city,
+          state: geoResult?.state || prev.state
+        }));
+        setIsLocating(false);
+      } else {
+        if (!navigator.geolocation) {
+          toast.error("Seu navegador não suporta geolocalização.", { id: 'geo_error' });
+          setIsLocating(false);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const geoResult = await reverseGeocode(lat, lng);
+          setFormData(prev => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+            city: geoResult?.city || prev.city,
+            state: geoResult?.state || prev.state
+          }));
+          setIsLocating(false);
+        }, (error) => {
+          console.error(error);
+          toast.error("Não foi possível obter sua localização. Verifique as permissões do navegador.", { id: 'geo_error' });
+          setIsLocating(false);
+        });
+      }
+    } catch (error) {
       console.error(error);
-      toast.error("Não foi possível obter sua localização. Verifique as permissões do navegador.");
+      toast.error("Não foi possível obter sua localização.", { id: 'geo_error' });
       setIsLocating(false);
-    });
+    }
   };
 
   const compressImage = (file) => {
@@ -187,20 +248,29 @@ export default function ProfilePage() {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) { toast.error('Limite máximo de 5MB.'); return; }
+    
+    const previewUrl = URL.createObjectURL(file);
+    setUploadPreview({ file, previewUrl, caption: '' });
+    e.target.value = null;
+  };
+
+  const confirmUpload = async () => {
+    if (!uploadPreview) return;
     setIsUploadingPhoto(true);
     try {
-      const compressedFile = await compressImage(file);
+      const compressedFile = await compressImage(uploadPreview.file);
       const fd = new FormData();
       fd.append('image', compressedFile);
+      if (uploadPreview.caption) fd.append('caption', uploadPreview.caption);
       if (!profile?.photos || profile.photos.length === 0) fd.append('is_primary', 'true');
       await profileAPI.uploadPhoto(fd);
       await loadProfile();
+      setUploadPreview(null);
     } catch (err) {
       console.error(err);
       toast.error('Erro ao enviar foto.');
     } finally {
       setIsUploadingPhoto(false);
-      e.target.value = null;
     }
   };
 
@@ -277,6 +347,15 @@ export default function ProfilePage() {
     try {
       const orders = newPhotos.map(p => p.id);
       await profileAPI.reorderPhotos(orders);
+      
+      if (targetIdx === 0 && !draggedItem.is_primary) {
+        const oldPrimary = profile.photos.find(p => p.is_primary);
+        if (oldPrimary && oldPrimary.id !== draggedItem.id) {
+          await profileAPI.updatePhoto(oldPrimary.id, { is_primary: false });
+        }
+        await profileAPI.updatePhoto(draggedItem.id, { is_primary: true });
+      }
+      
       await loadProfile();
     } catch(err) {
       toast.error('Erro ao reordenar fotos.');
@@ -366,7 +445,10 @@ export default function ProfilePage() {
           
           <div className="text-center mb-8">
             <div className="relative inline-block mb-5">
-              <div className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-600 to-red-600 p-0.5">
+              <div 
+                className="w-28 h-28 rounded-full bg-gradient-to-br from-purple-600 to-red-600 p-0.5 cursor-pointer"
+                onClick={() => setShowPreviewModal(true)}
+              >
                 <div className="w-full h-full rounded-full bg-[#1a1a2e] flex items-center justify-center overflow-hidden">
                   {profile?.photos?.length > 0 ? (
                     <img src={profile.photos.find(p => p.is_primary)?.image || profile.photos[0].image} alt="" className="w-full h-full object-cover" />
@@ -385,7 +467,7 @@ export default function ProfilePage() {
               </div>
             )}
             <button onClick={() => setShowPreviewModal(true)} className="mx-auto mt-2 flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors text-sm font-medium">
-              <Eye className="w-4 h-4" /> Visualizar como os outros veem
+              <Eye className="w-4 h-4" /> Visualizar como os outros te veem
             </button>
           </div>
 
@@ -406,15 +488,15 @@ export default function ProfilePage() {
                     >
                       <div className="relative flex-1 w-full h-full">
                         <img src={photo.image} alt="" className="w-full h-full object-cover pointer-events-none" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                          <button onClick={() => { setCaptionModalPhoto(photo); setCaptionText(photo.caption || ''); }} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-purple-500 transition-colors" title="Editar Legenda">
-                            <MessageSquareQuote className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeletePhoto(photo.id)} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-red-600 transition-colors" title="Excluir">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                        {photo.is_primary && <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider">Perfil</div>}
+                        
+                        <button onClick={(e) => { e.stopPropagation(); setCaptionModalPhoto(photo); setCaptionText(photo.caption || ''); }} className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-purple-500 transition-colors z-10 shadow-lg" title="Editar Legenda">
+                          <MessageSquareQuote className="w-4 h-4" />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); if(window.confirm('Tem certeza que deseja excluir esta foto?')) handleDeletePhoto(photo.id); }} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-red-600 transition-colors z-10 shadow-lg" title="Excluir">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        
+                        {photo.is_primary && <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md bg-purple-600/80 text-[10px] text-white font-medium uppercase tracking-wider shadow-lg">Perfil</div>}
                       </div>
                       {photo.caption && (
                         <div className="absolute bottom-0 inset-x-0 p-2 bg-black/70 backdrop-blur-md">
@@ -477,18 +559,18 @@ export default function ProfilePage() {
                 </div>
                 <h3 className="font-semibold text-lg text-gray-100">Informações do Perfil</h3>
               </div>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isEditing) handleSave();
-                    else setIsEditing(true);
-                  }}
-                  disabled={isSaving}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditing ? 'gradient-bg text-white' : 'border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'}`}
-                >
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditing ? <><Save className="w-4 h-4" /> Salvar</> : <><Pencil className="w-4 h-4" /> Editar</>}
-                </button>
+              <div className="flex items-center gap-2">
+                {!isEditingInfo && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsEditingInfo(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]"
+                  >
+                    <Pencil className="w-4 h-4" /> Editar
+                  </button>
+                )}
               </div>
             </div>
 
@@ -496,18 +578,18 @@ export default function ProfilePage() {
               <div className="p-6 pt-0 space-y-6 border-t border-[rgba(139,92,246,0.1)] mt-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Nome</label>
-                  {isEditing ? <input type="text" name="display_name" value={formData.display_name} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 bg-[#16162a] p-3 rounded-xl border border-[rgba(139,92,246,0.1)]">{profile?.display_name || '—'}</p>}
+                  {isEditingInfo ? <input type="text" name="display_name" value={formData.display_name} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 bg-[#16162a] p-3 rounded-xl border border-[rgba(139,92,246,0.1)]">{profile?.display_name || '—'}</p>}
                 </div>
               
               <div>
                 <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Bio</label>
-                {isEditing ? <textarea name="bio" value={formData.bio} onChange={handleChange} className="input-field text-sm resize-none h-20" maxLength={500} /> : <p className="text-gray-400 text-sm">{profile?.bio || '—'}</p>}
+                {isEditingInfo ? <textarea name="bio" value={formData.bio} onChange={handleChange} className="input-field text-sm resize-none h-20" maxLength={500} /> : <p className="text-gray-400 text-sm">{profile?.bio || '—'}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Gênero</label>
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <select name="gender" value={formData.gender} onChange={handleChange} className="input-field text-sm">
                       <option value="">Selecione</option><option value="M">Masculino</option><option value="F">Feminino</option>
                     </select>
@@ -515,7 +597,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Interessado em</label>
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <select name="looking_for" value={formData.looking_for} onChange={handleChange} className="input-field text-sm">
                       <option value="">Selecione</option><option value="M">Homens</option><option value="F">Mulheres</option><option value="A">Todos</option>
                     </select>
@@ -526,7 +608,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Altura (cm)</label>
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <>
                       <input 
                         type="number" 
@@ -541,7 +623,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Filhos</label>
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <select name="children" value={formData.children} onChange={handleChange} className="input-field text-sm">
                       <option value="">Selecione</option>{childrenOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
@@ -552,7 +634,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Religião</label>
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <select name="religion" value={formData.religion} onChange={handleChange} className="input-field text-sm">
                       <option value="">Selecione</option>{religionOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
@@ -560,7 +642,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Política</label>
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <select name="politics" value={formData.politics} onChange={handleChange} className="input-field text-sm">
                       <option value="">Selecione</option>{politicsOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
@@ -571,7 +653,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Escolaridade</label>
-                  {isEditing ? (
+                  {isEditingInfo ? (
                     <select name="education" value={formData.education} onChange={handleChange} className="input-field text-sm">
                       <option value="">Selecione</option>{educationOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
@@ -579,37 +661,43 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Universidade</label>
-                  {isEditing ? <input type="text" name="university" value={formData.university} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.university || '—'}</p>}
+                  {isEditingInfo ? <input type="text" name="university" value={formData.university} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.university || '—'}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Profissão</label>
-                  {isEditing ? <input type="text" name="job_title" value={formData.job_title} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.job_title || '—'}</p>}
+                  {isEditingInfo ? <input type="text" name="job_title" value={formData.job_title} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.job_title || '—'}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Empresa</label>
-                  {isEditing ? <input type="text" name="company" value={formData.company} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.company || '—'}</p>}
+                  {isEditingInfo ? <input type="text" name="company" value={formData.company} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.company || '—'}</p>}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mt-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Cidade</label>
-                  {isEditing ? <input type="text" name="city" value={formData.city} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.city || '—'}</p>}
+                  {isEditingInfo ? <input type="text" name="city" value={formData.city} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.city || '—'}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Estado</label>
-                  {isEditing ? <input type="text" name="state" value={formData.state} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.state || '—'}</p>}
+                  {isEditingInfo ? <input type="text" name="state" value={formData.state} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.state || '—'}</p>}
                 </div>
               </div>
 
-              {isEditing && (
+              {isEditingInfo && (
                 <div className="pt-2">
-                  <button type="button" onClick={handleGetLocation} disabled={isLocating} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors">
+                  <button type="button" onClick={handleGetLocation} disabled={isLocating} className="w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors">
                     {isLocating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />} Atualizar Localização
                   </button>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={handleCancelInfo} className="flex-1 btn-secondary !py-3 text-sm">Cancelar</button>
+                    <button type="button" onClick={handleSave} disabled={isSaving} className="flex-1 btn-primary !py-3 text-sm flex justify-center">
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar Alterações'}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -627,19 +715,19 @@ export default function ProfilePage() {
               </div>
               <h3 className="font-semibold text-lg text-gray-100">Preferências de Busca</h3>
             </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isEditing) handleSave();
-                  else setIsEditing(true);
-                  if (!openSections.preferences && !isEditing) toggleSection('preferences');
-                }}
-                disabled={isSaving}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${isEditing ? 'gradient-bg text-white' : 'border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]'}`}
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : isEditing ? <><Save className="w-4 h-4" /> Salvar</> : <><Pencil className="w-4 h-4" /> Editar</>}
-              </button>
+            <div className="flex items-center gap-2">
+              {!isEditingPreferences && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditingPreferences(true);
+                    if (!openSections.preferences) toggleSection('preferences');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all border border-[rgba(139,92,246,0.15)] text-gray-400 hover:border-[rgba(139,92,246,0.35)]"
+                >
+                  <Pencil className="w-4 h-4" /> Editar
+                </button>
+              )}
             </div>
           </div>
 
@@ -650,26 +738,35 @@ export default function ProfilePage() {
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider">Distância Máxima</label>
-                      <span className="text-xs text-purple-400 font-medium">{isEditing ? formData.max_distance_km : profile?.max_distance_km} km</span>
+                      <span className="text-xs text-purple-400 font-medium">{isEditingPreferences ? formData.max_distance_km : profile?.max_distance_km} km</span>
                     </div>
-                    {isEditing ? (
+                    {isEditingPreferences ? (
                       <RangeSlider name="max_distance_km" min="2" max="150" value={formData.max_distance_km} onChange={handleChange} />
                     ) : <div className="w-full bg-gray-800 rounded-full h-2 mt-2"><div className="bg-purple-500 h-2 rounded-full" style={{ width: `${(profile?.max_distance_km / 150) * 100}%` }}></div></div>}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Mín.</label>
-                      {isEditing ? <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.min_age_preference || '18'} anos</p>}
+                      {isEditingPreferences ? <input type="number" name="min_age_preference" min="18" max="99" value={formData.min_age_preference} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.min_age_preference || '18'} anos</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">Idade Máx.</label>
-                      {isEditing ? <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.max_age_preference || '99'} anos</p>}
+                      {isEditingPreferences ? <input type="number" name="max_age_preference" min="18" max="99" value={formData.max_age_preference} onChange={handleChange} className="input-field text-sm" /> : <p className="text-gray-100 text-sm">{profile?.max_age_preference || '99'} anos</p>}
                     </div>
                   </div>
-                </div>
+                  
+                  {isEditingPreferences && (
+                    <div className="flex gap-3 pt-4 border-t border-[rgba(139,92,246,0.1)]">
+                      <button type="button" onClick={handleCancelPreferences} className="flex-1 btn-secondary !py-3 text-sm">Cancelar</button>
+                      <button type="button" onClick={handleSave} disabled={isSaving} className="flex-1 btn-primary !py-3 text-sm flex justify-center">
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar Alterações'}
+                      </button>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
+        </div>
 
         <div className="card mb-8 overflow-hidden">
           <div 
@@ -705,6 +802,29 @@ export default function ProfilePage() {
           </button>
         </div>
       </div>
+
+      {uploadPreview && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6" onClick={() => setUploadPreview(null)}>
+          <div className="glass-strong rounded-2xl p-6 max-w-sm w-full animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold font-heading">Nova Foto</h3>
+              <X className="w-5 h-5 cursor-pointer text-gray-400" onClick={() => setUploadPreview(null)}/>
+            </div>
+            <div className="space-y-4">
+              <div className="relative w-full aspect-[4/5] bg-[#0a0a0f] rounded-xl overflow-hidden border border-[rgba(139,92,246,0.2)]">
+                <img src={uploadPreview.previewUrl} className="w-full h-full object-cover" alt="Preview" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Adicionar legenda (opcional)</label>
+                <textarea placeholder="Escreva uma legenda interessante..." className="input-field w-full text-sm resize-none h-20" value={uploadPreview.caption} onChange={e => setUploadPreview({...uploadPreview, caption: e.target.value})} maxLength={150} />
+              </div>
+              <button type="button" onClick={confirmUpload} disabled={isUploadingPhoto} className="w-full btn-primary !py-3.5 flex justify-center mt-2">
+                {isUploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar e Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPasswordModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6" onClick={() => setShowPasswordModal(false)}>
